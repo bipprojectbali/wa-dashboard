@@ -1,0 +1,55 @@
+# dependencies (bun install)
+node_modules
+
+# output
+out
+dist
+*.tgz
+
+# code coverage
+coverage
+*.lcov
+
+# logs
+logs
+_.log
+report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
+
+# dotenv environment variable files
+.env*
+!.env.example
+
+# TanStack Router generated
+src/frontend/routeTree.gen.ts
+
+# caches
+.eslintcache
+.cache
+*.tsbuildinfo
+
+# IntelliJ based IDEs
+.idea
+
+# Finder (MacOS) folder config
+.DS_Store
+
+/generated/prisma
+
+# agent-browser & ad-hoc screenshots yang tercecer di root
+.claude/scheduled_tasks.lock
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+
+# Scratch / ad-hoc files — never commit
+x.sh
+x.yml
+tasks/
+SOLUSI/
+
+# QA session artifacts — generated per-session, tidak di-commit
+# Hanya README.md dan screenshot.sh yang tetap di-track
+qa/*
+!qa/README.md
+!qa/screenshot.sh

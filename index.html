@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Full-stack starter template — Bun, Elysia, React, Prisma, Redis" />
+    <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <base href="/" />
+    <link rel="icon" type="image/svg+xml" href="/src/logo.svg" />
+    <title>WA Dashboard</title>
+    <!-- Prevent FOUC — sync, sebelum render apapun -->
+    <script>
+      (function () {
+        var s = localStorage.getItem('mantine-color-scheme-value');
+        var dark = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var scheme = dark ? 'dark' : 'light';
+        var bg = dark ? '#141414' : '#ffffff';
+        document.documentElement.setAttribute('data-mantine-color-scheme', scheme);
+        document.documentElement.style.background = bg;
+        document.documentElement.style.colorScheme = scheme;
+        window.__colorScheme = scheme;
+      })();
+    </script>
+    <style>
+      :root { margin: 0; padding: 0; }
+      html, body { margin: 0; padding: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/frontend.tsx"></script>
+  </body>
+</html>

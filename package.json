@@ -1,0 +1,68 @@
+{
+  "name": "wa-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/serve.ts",
+    "build": "vite build",
+    "start": "NODE_ENV=production bun src/index.tsx",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:integration": "bun test tests/integration",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "db:migrate": "bunx --bun prisma migrate dev",
+    "db:seed": "bun run prisma/seed.ts",
+    "db:studio": "bunx --bun prisma studio",
+    "db:generate": "bunx --bun prisma generate",
+    "db:push": "bunx --bun prisma db push",
+    "build:migrate": "bun build scripts/migrate.ts --compile --target=bun-linux-x64 --outfile migrate",
+    "build:server": "bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server"
+  },
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/html": "^1.4.0",
+    "@elysiajs/swagger": "^1.3.1",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@mantine/modals": "^8.3.18",
+    "@mantine/notifications": "^8.3.18",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@monaco-editor/react": "^4.7.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "7",
+    "@tanstack/react-query": "^5.95.2",
+    "@tanstack/react-router": "^1.168.10",
+    "@xyflow/react": "^12.10.2",
+    "better-auth": "^1.6.9",
+    "elkjs": "^0.11.1",
+    "elysia": "^1.4.28",
+    "pg": "^8.20.0",
+    "postcss": "^8.5.8",
+    "postcss-preset-mantine": "^1.18.0",
+    "postcss-simple-vars": "^7.0.1",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-icons": "^5.6.0",
+    "zod": "^4.4.3"
+  },
+  "overrides": {
+    "@modelcontextprotocol/sdk": {
+      "zod": "^4.4.3"
+    }
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.10",
+    "@types/bun": "latest",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.1",
+    "agentation": "^3.0.2",
+    "prisma": "7",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.3"
+  }
+}

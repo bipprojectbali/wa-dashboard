@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "agentation": {
+      "command": "npx",
+      "args": ["-y", "agentation-mcp", "server"]
+    },
+    "wa-dashboard-deploy-stg": {
+      "command": "bun",
+      "args": ["run", "scripts/mcp/deploy.ts"],
+      "env": {
+        "STACK_NAME": "${STG_STACK_NAME}",
+        "BASE_URL": "${STG_BASE_URL}",
+        "ENV": "stg",
+        "GH_TOKEN": "${GH_TOKEN}",
+        "GH_REPO": "${GH_REPO}"
+      }
+    }
+  }
+}

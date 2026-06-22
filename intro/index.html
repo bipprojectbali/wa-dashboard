@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WA Dashboard — Intro</title>
+  <style>
+    @font-face {
+      font-family: 'Bricolage Grotesque';
+      font-style: normal;
+      font-weight: 800;
+      src: url('fonts/bricolage-800.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      font-style: normal;
+      font-weight: 400;
+      src: url('fonts/jetbrains-400.woff2') format('woff2');
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0D1321;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+    }
+
+    /* ── Composition root ───────────────────────── */
+    #intro {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: #0D1321;
+    }
+
+    /* ── Background video ───────────────────────── */
+    #bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: 0;
+    }
+
+    /* ── Dark overlay — always present ─────────── */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background: #0D1321;
+      opacity: 0.55;
+      z-index: 1;
+    }
+
+    /* ── Radial glow ────────────────────────────── */
+    #glow {
+      position: absolute;
+      width: 700px;
+      height: 700px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(116,140,171,0.22) 0%, transparent 68%);
+      left: -60px;
+      top: 190px;
+      z-index: 2;
+      opacity: 0;
+    }
+
+    /* ── Ghost text ─────────────────────────────── */
+    #ghost {
+      position: absolute;
+      right: -20px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 260px;
+      color: #F0EBD8;
+      opacity: 0.11;
+      white-space: nowrap;
+      letter-spacing: -0.05em;
+      z-index: 2;
+      user-select: none;
+      line-height: 1;
+    }
+
+    /* ── Content zone (left-anchored) ───────────── */
+    .content {
+      position: absolute;
+      left: 140px;
+      top: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    /* ── Left accent bar ────────────────────────── */
+    #accent-bar {
+      width: 3px;
+      height: 72px;
+      background: #748CAB;
+      margin-bottom: 32px;
+      transform-origin: top center;
+    }
+
+    /* ── Main title ─────────────────────────────── */
+    #title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 800;
+      font-size: 104px;
+      color: #F0EBD8;
+      letter-spacing: -0.04em;
+      line-height: 1;
+      margin-bottom: 28px;
+    }
+
+    /* ── Tagline ────────────────────────────────── */
+    #tagline {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: 30px;
+      color: #748CAB;
+      letter-spacing: 0.01em;
+      margin-bottom: 32px;
+      line-height: 1.4;
+    }
+
+    /* ── Hairline rule ──────────────────────────── */
+    #rule {
+      width: 220px;
+      height: 1px;
+      background: #3E5C76;
+      margin-bottom: 28px;
+      transform-origin: left center;
+    }
+
+    /* ── Tech stack ─────────────────────────────── */
+    #tech-stack {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: 20px;
+      color: #748CAB;
+      letter-spacing: 0.03em;
+    }
+
+    /* ── Version label (top-right) ──────────────── */
+    #version {
+      position: absolute;
+      top: 52px;
+      right: 80px;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 400;
+      font-size: 15px;
+      color: #3E5C76;
+      letter-spacing: 0.06em;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="intro" data-composition-id="intro" data-width="1920" data-height="1080" data-start="0" data-duration="10" data-track-index="1">
+    <!-- Background video (muted — audio is separate) -->
+    <!-- Drop bg.mp4 into intro/ to activate.
+         Without it the #0D1321 background shows — composition works either way. -->
+    <video data-hf-studio-original-inline-translate="" data-hf-studio-original-translate="" data-hf-studio-path-offset="true" style="--hf-studio-offset-x:737px;--hf-studio-offset-y:78px;translate:var(--hf-studio-offset-x, 0px) var(--hf-studio-offset-y, 0px)" id="bg-video" data-start="0" data-duration="10" data-track-index="0" src="bg.mp4" muted playsinline loop></video>
+
+    <!-- Dark overlay — keeps text legible over any video content -->
+    <div id="overlay"></div>
+
+    <!-- Radial glow (BG decorative) -->
+    <div id="glow" data-layout-ignore=""></div>
+
+    <!-- Ghost text (BG decorative) -->
+    <div data-hf-studio-original-inline-translate="none" data-hf-studio-original-translate="" data-hf-studio-path-offset="true" style="--hf-studio-offset-x:-12px;--hf-studio-offset-y:201px;translate:var(--hf-studio-offset-x, 0px) var(--hf-studio-offset-y, 0px)" id="ghost" data-layout-ignore="">BASE TEMPLATE</div>
+
+    <!-- Version label (FG accent, top-right) -->
+    <div id="version">v0.1.0 · 2026</div>
+
+    <!-- Content zone (left-anchored) -->
+    <div data-hf-studio-original-inline-translate="" data-hf-studio-original-translate="" data-hf-studio-path-offset="true" style="--hf-studio-offset-x:733px;--hf-studio-offset-y:219px;translate:var(--hf-studio-offset-x, 0px) var(--hf-studio-offset-y, 0px)" class="content">
+      <div id="accent-bar"></div>
+      <h1 id="title">WA Dashboard</h1>
+      <p id="tagline">Build full-stack apps at lightning speed</p>
+      <div id="rule"></div>
+      <p id="tech-stack">Bun · Elysia · React · Prisma</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <script>
+      window.__timelines = window.__timelines || {};
+
+      const COMP = 10;
+      const tl = gsap.timeline({ paused: true });
+
+      // ── BG: glow entrance (opacity only — no scale conflict) ──
+      tl.fromTo('#glow',
+        { opacity: 0 },
+        { opacity: 1, duration: 1.5, ease: 'sine.out' },
+        0.0
+      );
+
+      // ── BG: glow ambient breath — starts after entrance (t=1.5)
+      // 2.5s × (yoyo × 3 repeats) = 4 iterations = 10s from t=1.5
+      // ends at 11.5s, but glow exits at 9.0s — safe
+      tl.to('#glow', {
+        scale: 1.06,
+        yoyo: true,
+        repeat: 3,
+        duration: 2.5,
+        ease: 'sine.inOut'
+      }, 1.5);
+
+      // ── BG: ghost text drift (x only — opacity set in CSS at 0.11)
+      tl.fromTo('#ghost',
+        { x: 0 },
+        { x: -40, duration: COMP, ease: 'none' },
+        0.0
+      );
+
+      // ── MG: left accent bar (scaleY 0→1, top-origin) ──────────
+      tl.fromTo('#accent-bar',
+        { scaleY: 0 },
+        { scaleY: 1, duration: 0.35, ease: 'expo.out' },
+        0.2
+      );
+
+      // ── MG: main title (y+70→0, opacity 0→1) ──────────────────
+      tl.fromTo('#title',
+        { y: 70, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.85, ease: 'expo.out' },
+        0.7
+      );
+
+      // ── FG: version label (opacity 0→0.65) ────────────────────
+      tl.fromTo('#version',
+        { opacity: 0 },
+        { opacity: 0.65, duration: 0.5, ease: 'sine.out' },
+        1.2
+      );
+
+      // ── MG: tagline (x-50→0, opacity 0→1) ────────────────────
+      tl.fromTo('#tagline',
+        { x: -50, opacity: 0 },
+        { x: 0, opacity: 1, duration: 0.6, ease: 'power3.out' },
+        1.55
+      );
+
+      // ── MG: hairline rule (scaleX 0→1, left-origin) ───────────
+      tl.fromTo('#rule',
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.5, ease: 'power2.out' },
+        2.0
+      );
+
+      // ── MG: tech stack (opacity 0→0.7) ────────────────────────
+      tl.fromTo('#tech-stack',
+        { opacity: 0 },
+        { opacity: 0.7, duration: 0.45, ease: 'sine.out' },
+        2.5
+      );
+
+      // ── BREATHE (2.8–8.5s): all elements visible, glow breathes ──
+      // (no tweens needed — ambient motion already on tl)
+
+      // ── RESOLVE (t=8.5): final scene — exits allowed ─────────
+      tl.fromTo('#title',
+        { opacity: 1 },
+        { opacity: 0, duration: 0.7, ease: 'power2.in' },
+        8.5
+      );
+      tl.fromTo('#tagline',
+        { opacity: 1 },
+        { opacity: 0, duration: 0.55, ease: 'power2.in' },
+        8.58
+      );
+      tl.fromTo('#rule',
+        { scaleX: 1 },
+        { scaleX: 0, duration: 0.4, ease: 'power2.in' },
+        8.62
+      );
+      tl.fromTo('#tech-stack',
+        { opacity: 0.7 },
+        { opacity: 0, duration: 0.4, ease: 'power2.in' },
+        8.62
+      );
+      tl.fromTo('#version',
+        { opacity: 0.65 },
+        { opacity: 0, duration: 0.4, ease: 'sine.in' },
+        8.62
+      );
+      tl.fromTo('#accent-bar',
+        { scaleY: 1 },
+        { scaleY: 0, duration: 0.35, ease: 'power2.in' },
+        8.7
+      );
+
+      // Hard-kill after exits — deterministic black frame
+      tl.set('#accent-bar', { opacity: 0 }, 9.06);
+      tl.set('#title',      { opacity: 0 }, 9.22);
+      tl.set('#tagline',    { opacity: 0 }, 9.22);
+      tl.set('#rule',       { scaleX: 0  }, 9.06);
+      tl.set('#tech-stack', { opacity: 0 }, 9.06);
+      tl.set('#version',    { opacity: 0 }, 9.06);
+
+      // Glow + ghost fade (overwrite: 'auto' resolves any scale/opacity conflicts)
+      tl.fromTo('#glow',
+        { opacity: 1 },
+        { opacity: 0, duration: 0.6, ease: 'sine.in', overwrite: 'auto' },
+        9.0
+      );
+      tl.fromTo('#ghost',
+        { opacity: 0.11 },
+        { opacity: 0, duration: 0.6, ease: 'sine.in', overwrite: 'auto' },
+        9.0
+      );
+
+      // Overlay swells to fill — covers video with solid black
+      tl.fromTo('#overlay',
+        { opacity: 0.55 },
+        { opacity: 1, duration: 0.6, ease: 'power2.in' },
+        9.1
+      );
+
+      window.__timelines['intro'] = tl;
+    </script>
+  </div>
+
+  <!-- Background audio — add music.mp3 to intro/ to activate -->
+  <!-- Placed outside composition div: audio is a separate clip -->
+  <audio id="bg-music" data-start="0" data-duration="10" data-track-index="2" data-volume="0.18" src="music.mp3"></audio>
+
+</body>
+</html>
