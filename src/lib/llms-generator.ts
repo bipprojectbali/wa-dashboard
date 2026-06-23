@@ -1,0 +1,179 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { type ChangelogEntry, parseChangelog } from './changelog-parser'
+import { ENV_DEFS } from './env-map-catalog'
+import { ROUTES_CATALOG, type RouteEntry } from './routes-catalog'
+import { type ParsedSchema, parseSchema } from './schema-parser'
+
+const PROJECT_ROOT = join(import.meta.dir, '../..')
+
+export interface ProjectMeta {
+  name: string
+  version: string
+  description: string
+}
+
+export interface DocLink {
+  title: string
+  path: string
+  summary: string
+}
+
+export interface LlmsData {
+  meta: ProjectMeta
+  routes: RouteEntry[]
+  schema: ParsedSchema
+  env: typeof ENV_DEFS
+  changelog: ChangelogEntry[]
+  docs: DocLink[]
+}
+
+// One-line summaries for the doc set. Keep in sync with files in docs/.
+const DOC_SUMMARIES: Record<string, string> = {
+  'CLAUDE.md': 'Project overview, runtime/tooling commands, folder structure',
+  'README.md': 'Human-facing setup and tech stack',
+  'docs/API.md': 'All HTTP route definitions and contracts',
+  'docs/AUTH.md': 'Auth flow, roles, sessions, ticket status machine',
+  'docs/DATABASE.md': 'Prisma schema, Redis namespaces, audit logs',
+  'docs/FRONTEND.md': 'React routes, hooks, components, UI conventions',
+  'docs/MCP.md': 'MCP server tools and HTTP fallback',
+  'docs/WA-POLICY.md': 'WhatsApp anti-ban policy contract and enforcement',
+  'docs/SCALING.md': 'Performance and scaling playbook',
+  'docs/FILE-HEALTH.md': 'File size limits and split rules',
+  'docs/FEATURE-CHECKLIST.md': 'Required steps when adding a feature',
+  'docs/AI_CONTRACT.md': 'Working contract for AI agents in this repo',
+}
+
+function readFirstParagraph(absPath: string): string {
+  try {
+    const raw = readFileSync(absPath, 'utf-8')
+    for (const line of raw.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('>')) continue
+      return trimmed.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    }
+  } catch {}
+  return ''
+}
+
+export function collectLlmsData(root: string = PROJECT_ROOT): LlmsData {
+  const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8'))
+
+  let schema: ParsedSchema = { models: [], enums: [], relations: [] }
+  try {
+    schema = parseSchema(readFileSync(join(root, 'prisma/schema.prisma'), 'utf-8'))
+  } catch {}
+
+  const docs: DocLink[] = Object.entries(DOC_SUMMARIES).map(([path, summary]) => ({
+    title: path.split('/').pop()!.replace(/\.md$/, ''),
+    path,
+    summary,
+  }))
+
+  return {
+    meta: {
+      name: pkg.name ?? 'unknown',
+      version: pkg.version ?? '0.0.0',
+      description: pkg.description || readFirstParagraph(join(root, 'README.md')) || 'No description',
+    },
+    routes: ROUTES_CATALOG,
+    schema,
+    env: ENV_DEFS,
+    changelog: parseChangelog(),
+    docs,
+  }
+}
+
+function renderRoutes(routes: RouteEntry[]): string {
+  const byCategory = new Map<string, RouteEntry[]>()
+  for (const r of routes) {
+    const list = byCategory.get(r.category) ?? []
+    list.push(r)
+    byCategory.set(r.category, list)
+  }
+  const lines: string[] = []
+  for (const [category, list] of byCategory) {
+    lines.push(`\n### ${category}`)
+    for (const r of list) {
+      lines.push(`- \`${r.method} ${r.path}\` (${r.auth}) — ${r.description}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function renderSchema(schema: ParsedSchema): string {
+  const lines: string[] = []
+  if (schema.enums.length) {
+    lines.push('\n### Enums')
+    for (const e of schema.enums) {
+      lines.push(`- **${e.name}**: ${e.values.join(' | ')}`)
+    }
+  }
+  if (schema.models.length) {
+    lines.push('\n### Models')
+    for (const m of schema.models) {
+      const fieldNames = m.fields.map((f) => f.name).join(', ')
+      lines.push(`- **${m.name}** (table \`${m.tableName}\`): ${fieldNames}`)
+    }
+  }
+  return lines.join('\n')
+}
+
+function renderEnv(env: typeof ENV_DEFS): string {
+  const lines: string[] = []
+  for (const e of env) {
+    const req = e.required ? 'required' : `optional, default: ${e.default ?? 'none'}`
+    lines.push(`- \`${e.envKey}\` (${req}) — ${e.description}`)
+  }
+  return lines.join('\n')
+}
+
+function renderChangelog(entries: ChangelogEntry[]): string {
+  const recent = entries.filter((e) => e.version !== 'Unreleased').slice(0, 3)
+  if (!recent.length) return '\n_No released versions yet._'
+  const lines: string[] = []
+  for (const entry of recent) {
+    lines.push(`\n### ${entry.version}${entry.date ? ` — ${entry.date}` : ''}`)
+    for (const [section, items] of Object.entries(entry.sections)) {
+      for (const item of items) {
+        lines.push(`- ${section}: ${item}`)
+      }
+    }
+  }
+  return lines.join('\n')
+}
+
+function renderDocs(docs: DocLink[]): string {
+  return docs.map((d) => `- [${d.title}](${d.path}): ${d.summary}`).join('\n')
+}
+
+export function generateLlmsTxt(data: LlmsData): string {
+  const { meta } = data
+  return `# ${meta.name} (v${meta.version})
+
+> ${meta.description}
+
+This file is auto-generated by \`bun run docs:llms\`. Do not edit by hand —
+it is rebuilt from package.json, the route catalog, Prisma schema, env catalog,
+CHANGELOG.md, and the docs/ folder. Edit those sources instead.
+
+## Documentation
+${renderDocs(data.docs)}
+
+## API Routes
+${renderRoutes(data.routes)}
+
+## Database Schema
+${renderSchema(data.schema)}
+
+## Environment Variables
+${renderEnv(data.env)}
+
+## Recent Changes
+${renderChangelog(data.changelog)}
+`
+}
+
+export function buildLlmsTxt(root?: string): string {
+  return generateLlmsTxt(collectLlmsData(root))
+}

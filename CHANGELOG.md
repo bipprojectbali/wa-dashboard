@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **`GET /llms.txt`** — ringkasan project siap-LLM (`text/plain`, `Cache-Control: public, max-age=300`), dibangun live tiap request dari package.json, route catalog, schema Prisma, env catalog, CHANGELOG, dan docs/. CLI `bun run docs:llms` (tulis ke disk) + `bun run docs:llms:check` (cek staleness di CI). Generator murni di `src/lib/llms-generator.ts`.
 - **Foto profil kontak WhatsApp** di tab "Info Akun" (`/wa?tab=account`) — avatar dimuat lazy per baris yang masuk viewport (`IntersectionObserver`), dengan fallback inisial nama untuk nomor tanpa foto. Endpoint `GET /api/wa/avatar?contactId=...` mem-proxy `getProfilePicUrl` dan men-cache hasil di Redis (`wa:avatar:<userId>:<contactId>`, TTL 1 jam). MCP tools `wa_avatar` (dev) + `stg_wa_avatar` (staging).
 - **WhatsApp anti-ban policy ("kontrak sumpah pengikat")** — kontrak terdokumentasi + enforcement teknis nyata di `POST /api/wa/send`: wajib acknowledge kontrak, blokir kirim-duluan (first-contact) ke nomor non-kontak, jeda minimum antar pesan, cooldown per nomor, dan plafon volume menit/jam/hari. Pelanggaran → 403 (kebijakan) / 429 (rate limit) + audit `WA_SEND_BLOCKED`.
 - Halaman **Aturan & Kontrak** di `/wa?tab=policy` — baca kontrak, acknowledge, lihat kuota pakai, dan (SUPER_ADMIN) atur policy global.

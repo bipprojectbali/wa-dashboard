@@ -23,6 +23,8 @@ bun run start           # production server
 bun run typecheck       # tsc --noEmit
 bun run lint            # biome check
 bun run lint:fix        # biome check --write
+bun run docs:llms       # regenerate llms.txt from project sources
+bun run docs:llms:check # fail if llms.txt is stale (CI guard)
 ```
 
 ## Testing

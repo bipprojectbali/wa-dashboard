@@ -98,6 +98,7 @@ Frontend: route `/wa` (`src/frontend/routes/wa.tsx`), panel di `src/frontend/com
 - `GET /api/version` — `{ name, version }` from package.json
 - `GET /api/changelog` — latest changelog entry as JSON (`{ version, date, sections }`). Pass `?all=true` for all versions.
 - `GET /api/hello` / `PUT /api/hello` / `GET /api/hello/:name`
+- `GET /llms.txt` — LLM-friendly project summary, `text/plain` (`Cache-Control: public, max-age=300`). Auto-generated live from package.json, the route catalog, Prisma schema, env catalog, CHANGELOG.md, and docs/. Routed through Elysia via `API_EXACT` in `src/index.tsx` (the dot in the path would otherwise classify it as a static asset). Regenerate the on-disk copy with `bun run docs:llms`; verify freshness in CI with `bun run docs:llms:check`. Generator: `src/lib/llms-generator.ts`.
 
 ## WebSocket
 

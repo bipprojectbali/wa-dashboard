@@ -13,6 +13,8 @@
     "test:integration": "bun test tests/integration",
     "lint": "biome check src/",
     "lint:fix": "biome check --write src/",
+    "docs:llms": "bun scripts/gen-llms.ts",
+    "docs:llms:check": "bun scripts/gen-llms.ts --check",
     "db:migrate": "bunx --bun prisma migrate dev",
     "db:seed": "bun run prisma/seed.ts",
     "db:studio": "bunx --bun prisma studio",

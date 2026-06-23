@@ -16,6 +16,7 @@ import { adminLogsRouter } from './routes/admin/logs'
 import { adminUsersRouter } from './routes/admin/users'
 import { changelogRouter } from './routes/changelog'
 import { devAuthRouter } from './routes/dev-auth'
+import { llmsRouter } from './routes/llms'
 import { ticketsRouter } from './routes/tickets'
 import { waRouter } from './routes/wa'
 
@@ -46,6 +47,7 @@ export function createApp() {
       .use(ticketsRouter)
       .use(changelogRouter)
       .use(waRouter)
+      .use(llmsRouter)
 
       // ─── Global Error Handler ──────────────────────────────
       .onError(({ code, error, request }) => {

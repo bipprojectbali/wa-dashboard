@@ -206,6 +206,13 @@ export const ROUTES_CATALOG: RouteEntry[] = [
     description: 'Attach evidence',
   },
   { method: 'GET', path: '/health', auth: 'public', category: 'utility', description: 'Health check' },
+  {
+    method: 'GET',
+    path: '/llms.txt',
+    auth: 'public',
+    category: 'utility',
+    description: 'LLM-friendly project summary (auto-generated)',
+  },
   { method: 'GET', path: '/api/version', auth: 'public', category: 'utility', description: 'App version' },
   { method: 'GET', path: '/api/hello', auth: 'public', category: 'utility', description: 'Hello world (GET)' },
   { method: 'PUT', path: '/api/hello', auth: 'public', category: 'utility', description: 'Hello world (PUT)' },

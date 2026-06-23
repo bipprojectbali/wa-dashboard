@@ -8,9 +8,13 @@ const isProduction = env.NODE_ENV === 'production'
 
 // ─── Route Classification ──────────────────────────────
 const API_PREFIXES = ['/api/', '/webhook/', '/ws/', '/health']
+// Exact paths that must hit Elysia, not the static/SPA server. These contain a
+// dot (e.g. `/llms.txt`) so the `!pathname.includes('.')` SPA heuristic would
+// otherwise mistake them for a static asset.
+const API_EXACT = new Set(['/llms.txt'])
 
 function isApiRoute(pathname: string): boolean {
-  return API_PREFIXES.some((p) => pathname.startsWith(p)) || pathname === '/health'
+  return API_PREFIXES.some((p) => pathname.startsWith(p)) || API_EXACT.has(pathname)
 }
 
 // ─── Vite Dev Server (dev only) ────────────────────────
@@ -75,6 +79,12 @@ async function serveFrontend(request: Request): Promise<Response> {
         },
         getHeader(name: string) {
           return this.headers[name.toLowerCase()]
+        },
+        appendHeader(name: string, value: string) {
+          const key = name.toLowerCase()
+          const existing = this.headers[key]
+          this.headers[key] = existing ? `${existing}, ${value}` : value
+          return this
         },
         removeHeader(name: string) {
           delete this.headers[name.toLowerCase()]
