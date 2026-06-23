@@ -20,11 +20,13 @@ import '@xyflow/react/dist/style.css'
 import { modals } from '@mantine/modals'
 import {
   TbApi,
+  TbBrandWhatsapp,
   TbBug,
   TbChevronRight,
   TbCode,
   TbDatabase,
   TbDotsVertical,
+  TbFileText,
   TbLayoutDashboard,
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
@@ -252,6 +254,30 @@ function DevPage() {
           )}
 
           {collapsed ? (
+            <Tooltip label="WhatsApp" position="right">
+              <ActionIcon
+                variant="subtle"
+                color="green"
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
+              >
+                <TbBrandWhatsapp size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="WhatsApp"
+              leftSection={<TbBrandWhatsapp size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? (
             <Tooltip label="Pembaruan" position="right">
               <ActionIcon
                 variant="subtle"
@@ -272,6 +298,37 @@ function DevPage() {
               rightSection={<TbChevronRight size={14} />}
               component={Link}
               to="/changelog"
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? (
+            <Tooltip label="llms.txt" position="right">
+              <ActionIcon
+                variant="subtle"
+                color="grape"
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                component="a"
+                href="/llms.txt"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <TbFileText size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="llms.txt"
+              description="Ringkasan project untuk LLM"
+              leftSection={<TbFileText size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              component="a"
+              href="/llms.txt"
+              target="_blank"
+              rel="noopener noreferrer"
               variant="light"
               mb={4}
             />
