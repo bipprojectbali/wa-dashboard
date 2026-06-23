@@ -6,6 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Pairing WhatsApp via nomor HP** di `/wa?tab=connection` — selain scan QR, kini bisa minta kode pairing dengan memasukkan nomor HP (toggle QR ↔ Nomor HP). Memakai endpoint `POST /api/wa/session/pairing-code` yang sudah ada; kode pairing ditampilkan dengan tombol salin.
 - **`GET /llms.txt`** — ringkasan project siap-LLM (`text/plain`, `Cache-Control: public, max-age=300`), dibangun live tiap request dari package.json, route catalog, schema Prisma, env catalog, CHANGELOG, dan docs/. CLI `bun run docs:llms` (tulis ke disk) + `bun run docs:llms:check` (cek staleness di CI). Generator murni di `src/lib/llms-generator.ts`.
 - **Foto profil kontak WhatsApp** di tab "Info Akun" (`/wa?tab=account`) — avatar dimuat lazy per baris yang masuk viewport (`IntersectionObserver`), dengan fallback inisial nama untuk nomor tanpa foto. Endpoint `GET /api/wa/avatar?contactId=...` mem-proxy `getProfilePicUrl` dan men-cache hasil di Redis (`wa:avatar:<userId>:<contactId>`, TTL 1 jam). MCP tools `wa_avatar` (dev) + `stg_wa_avatar` (staging).
 - **WhatsApp anti-ban policy ("kontrak sumpah pengikat")** — kontrak terdokumentasi + enforcement teknis nyata di `POST /api/wa/send`: wajib acknowledge kontrak, blokir kirim-duluan (first-contact) ke nomor non-kontak, jeda minimum antar pesan, cooldown per nomor, dan plafon volume menit/jam/hari. Pelanggaran → 403 (kebijakan) / 429 (rate limit) + audit `WA_SEND_BLOCKED`.
@@ -15,6 +16,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Mode OTP (first-contact) sebagai escape-hatch SUPER_ADMIN, **default MATI** — aman out-of-the-box, aktivasi tercatat di audit `WA_POLICY_UPDATED`.
 - MCP tools `wa_policy_get` / `wa_policy_usage` / `wa_policy_set` (dev) dan `stg_wa_policy` (staging).
 - Dokumentasi kontrak lengkap di `docs/WA-POLICY.md`.
+
+### Fixed
+- **QR code tidak hilang setelah pairing sukses** di `/wa?tab=connection` — saat WS realtime aktif, polling status dimatikan total sehingga transisi ke `CONNECTED` bisa terlewat dan QR macet tampil. Sekarang status tetap di-poll 3 detik selama belum `CONNECTED`, baru mengandalkan WS setelah terhubung.
+- **Pairing via nomor HP gagal 422** — `apiFetch` tidak menyetel `Content-Type: application/json` saat mengirim body, sehingga server menerima `text/plain`, gagal mem-parse body, dan validasi `phoneNumber` ditolak. Sekarang `apiFetch` otomatis menambahkan header JSON bila ada body (header eksplisit dari caller tetap menang). `UnauthorizedError` dipindah ke `src/frontend/lib/errors.ts` agar `apiFetch` bisa diuji unit tanpa menyeret pohon React.
+- **Tombol "Minta Kode" pairing senyap saat sesi belum dimulai** — container wwebjs-api membalas `HTTP 200 { success: false, message: "session_not_found" }` untuk error level-aplikasi; karena frontend hanya cek status HTTP (bukan field `success`), kegagalan tertelan diam-diam: tak ada kode, tak ada error, tak ada loading. Logika ekstraksi kode dipindah ke `src/frontend/lib/wa-pairing.ts` (`pairingCodeOrThrow`) yang melempar Error dengan pesan actionable ("Klik Start dulu…") saat `success:false` / tak ada kode, sehingga muncul di alert merah.
 
 ### Changed
 - Brand renamed from Base Template → **WA Dashboard**; project reinitialized from base-template2

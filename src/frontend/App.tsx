@@ -6,14 +6,10 @@ import '@mantine/notifications/styles.css'
 import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 import { WhatsNewModal } from './components/WhatsNewModal'
+import { UnauthorizedError } from './lib/errors'
 import { router } from './router'
 
-export class UnauthorizedError extends Error {
-  constructor() {
-    super('Unauthorized')
-    this.name = 'UnauthorizedError'
-  }
-}
+export { UnauthorizedError }
 
 const theme = createTheme({
   primaryColor: 'blue',

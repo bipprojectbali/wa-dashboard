@@ -44,6 +44,10 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 
 ### WA panels (`src/frontend/components/wa/`)
 
+Tab `?tab=connection` ("Koneksi"):
+- `WaConnectionPanel.tsx` — status koneksi + tombol Start/Restart/Terminate. Query `['wa','status']` GET `/api/wa/session/status`; selama state belum `CONNECTED` selalu polling 3s (transisi pairing bisa terjadi tanpa event WS final), setelah `CONNECTED` mengandalkan WS bila `wsReady` (fallback polling bila WS mati). Kartu pairing punya `SegmentedControl` QR ↔ Nomor HP: mode QR menampilkan `GET /api/wa/session/qr/image`; mode Nomor HP kirim `POST /api/wa/session/pairing-code` lalu menampilkan kode pairing dengan tombol salin.
+- `src/frontend/lib/wa-pairing.ts` — helper murni (tanpa React) untuk flow pairing: `extractPairingCode` (baca varian bentuk respons container) dan `pairingCodeOrThrow` (lempar Error actionable saat container balas `HTTP 200 { success: false }`, mis. `session_not_found` — kalau tidak, kegagalan tertelan diam karena `apiFetch` hanya throw pada non-2xx). Dipakai sebagai `mutationFn` pairing agar error muncul di `pairing.error`/alert.
+
 Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 - `WaPolicyPanel.tsx` — orchestrator, query `['wa','policy']` GET `/api/wa/policy`. Banner oranye saat `allowFirstContact=true` (mode OTP aktif).
 - `WaContractView.tsx` — render teks kontrak + tombol "Saya setuju & paham risikonya" → POST `/api/wa/policy/ack`. Saat sudah disetujui, muncul tombol "Batalkan persetujuan" (modal konfirmasi) → DELETE `/api/wa/policy/ack`.
@@ -54,6 +58,10 @@ Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 Tab `?tab=account` ("Info Akun"):
 - `WaAccountPanel.tsx` — info akun + tabel kontak dengan search box (nama/nomor) dan kolom "Foto".
 - `WaContactAvatar.tsx` — avatar lazy per kontak. `IntersectionObserver` (`rootMargin: '100px'`) menunda fetch sampai baris masuk viewport, lalu query `['wa','avatar',contactId]` GET `/api/wa/avatar`. Mantine `<Avatar>` fallback ke inisial nama bila `url` null.
+
+## Data Fetching
+
+- `src/frontend/lib/apiFetch.ts` — `apiFetch<T>(path, init?)` wrapper di atas `fetch`. Selalu `credentials: 'include'`; **otomatis menyetel `Content-Type: application/json` saat `init.body` ada** (header eksplisit dari caller tetap menang) — caller cukup `body: JSON.stringify(...)` tanpa perlu set header manual. Melempar `UnauthorizedError` (dari `src/frontend/lib/errors.ts`) pada 401 agar `QueryCache` global mereset session; pada non-ok lain melempar `Error` dengan pesan dari field `error` body.
 
 ## UI Conventions
 

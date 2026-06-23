@@ -65,6 +65,11 @@ beforeAll(async () => {
           headers: { 'content-type': 'application/json' },
         })
       }
+      if (url.includes('/session/requestPairingCode/')) {
+        return new Response(JSON.stringify({ success: true, result: '12345678' }), {
+          headers: { 'content-type': 'application/json' },
+        })
+      }
       return new Response(JSON.stringify({ success: true, state: 'CONNECTED' }), {
         headers: { 'content-type': 'application/json' },
       })
@@ -196,6 +201,56 @@ describe('upstream container failure → 502', () => {
     expect(res.status).toBe(502)
     const body = await res.json()
     expect(body.error).toContain('WA API 404')
+  })
+})
+
+describe('POST /api/wa/session/pairing-code', () => {
+  test('returns 401 without session', async () => {
+    const res = await app.handle(
+      new Request('http://localhost/api/wa/session/pairing-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: '628123456789' }),
+      }),
+    )
+    expect(res.status).toBe(401)
+  })
+
+  test('returns 403 for USER role', async () => {
+    const res = await app.handle(
+      new Request('http://localhost/api/wa/session/pairing-code', {
+        method: 'POST',
+        headers: { cookie: userCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: '628123456789' }),
+      }),
+    )
+    expect(res.status).toBe(403)
+  })
+
+  test('validates missing phoneNumber', async () => {
+    const res = await app.handle(
+      new Request('http://localhost/api/wa/session/pairing-code', {
+        method: 'POST',
+        headers: { cookie: adminCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      }),
+    )
+    expect([400, 422]).toContain(res.status)
+  })
+
+  test('returns pairing code for ADMIN, uses sessionId == user.id', async () => {
+    waCalls = []
+    const res = await app.handle(
+      new Request('http://localhost/api/wa/session/pairing-code', {
+        method: 'POST',
+        headers: { cookie: adminCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: '628123456789' }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.result).toBe('12345678')
+    expect(waCalls.some((u) => u.endsWith(`/session/requestPairingCode/${adminId}`))).toBe(true)
   })
 })
 
