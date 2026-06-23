@@ -18,6 +18,7 @@ import { modals } from '@mantine/modals'
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
+  TbBrandWhatsapp,
   TbBug,
   TbCalendar,
   TbChevronRight,
@@ -261,6 +262,33 @@ function DashboardPage() {
                   mb={4}
                 />
               </>
+            ))}
+
+          {!isQcOnly &&
+            (collapsed ? (
+              <Tooltip label="WhatsApp" position="right">
+                <ActionIcon
+                  variant="subtle"
+                  color="teal"
+                  size="lg"
+                  mb={4}
+                  style={{ width: '100%' }}
+                  component={Link}
+                  to="/wa"
+                >
+                  <TbBrandWhatsapp size={18} />
+                </ActionIcon>
+              </Tooltip>
+            ) : (
+              <NavLink
+                label="WhatsApp"
+                leftSection={<TbBrandWhatsapp size={18} />}
+                rightSection={<TbChevronRight size={14} />}
+                component={Link}
+                to="/wa"
+                variant="light"
+                mb={4}
+              />
             ))}
 
           {collapsed ? (

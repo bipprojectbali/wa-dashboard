@@ -1,15 +1,8 @@
 import { Text } from '@mantine/core'
+import { useEffect, useRef, useState } from 'react'
 import { FcGoogle } from 'react-icons/fc'
 import { SiBun, SiPostgresql, SiPrisma, SiReact, SiRedis, SiVite } from 'react-icons/si'
-import {
-  TbBolt,
-  TbDatabase,
-  TbKey,
-  TbShieldCheck,
-  TbUsers,
-  TbWifi,
-} from 'react-icons/tb'
-import { useEffect, useRef, useState } from 'react'
+import { TbBolt, TbDatabase, TbKey, TbShieldCheck, TbUsers, TbWifi } from 'react-icons/tb'
 
 export const features = [
   {
@@ -80,6 +73,7 @@ export function useScrollReveal() {
 export function FeatureCard({ icon: Icon, color, title, desc, delay }: (typeof features)[0] & { delay: number }) {
   const { ref, visible } = useScrollReveal()
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: hover handlers are decorative-only (border/background tint), not interactive behavior
     <div
       ref={ref}
       style={{

@@ -22,6 +22,7 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 | `profile.tsx` | `profileRoute` | `/profile` | authenticated |
 | `blocked.tsx` | `blockedRoute` | `/blocked` | authenticated |
 | `changelog.tsx` | `changelogRoute` | `/changelog` | authenticated — full version history from `GET /api/changelog?all=true` |
+| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|policy) |
 
 **Rule:** new route → (1) create file, (2) export `*Route` via `createRoute`, (3) add to `router.ts` `addChildren([...])`.
 
@@ -31,6 +32,7 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
   - Uses Better Auth React client (`src/lib/auth-client.ts`)
   - `beforeLoad` in each route calls `authClient.getSession()` via `queryClient.ensureQueryData`
 - `src/frontend/hooks/usePresence.ts` — WebSocket auto-connect, exposes `onlineUserIds`
+- `src/frontend/hooks/useWaRealtime.ts` — connect `/ws/wa`, invalidate query `['wa','status']`/`['wa','qr']` saat event masuk, expose `wsReady` (panel pakai ini untuk fallback polling)
 
 ## Components (`src/frontend/components/`)
 
@@ -39,6 +41,19 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 - `WhatsNewModal.tsx` — "What's New" modal shown on app load when version changes. Compares `/api/version` vs `localStorage.last_seen_version`; fetches `/api/changelog` and shows a Mantine modal with Added/Changed/Fixed/Removed sections. Dismissed version is saved to `localStorage`.
 - `NotFound.tsx` — 404 page
 - `ErrorPage.tsx` — error boundary
+
+### WA panels (`src/frontend/components/wa/`)
+
+Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
+- `WaPolicyPanel.tsx` — orchestrator, query `['wa','policy']` GET `/api/wa/policy`. Banner oranye saat `allowFirstContact=true` (mode OTP aktif).
+- `WaContractView.tsx` — render teks kontrak + tombol "Saya setuju & paham risikonya" → POST `/api/wa/policy/ack`. Saat sudah disetujui, muncul tombol "Batalkan persetujuan" (modal konfirmasi) → DELETE `/api/wa/policy/ack`.
+- `WaPolicyUsage.tsx` — progress bar kuota menit/jam/hari.
+- `WaPolicySettings.tsx` — form editable (SUPER_ADMIN saja, `canEdit`) → PUT `/api/wa/policy`.
+- `wa-policy.types.ts` — tipe `WaPolicy`, `UsageSnapshot`, `PolicyResponse`, `PolicyEditable`.
+
+Tab `?tab=account` ("Info Akun"):
+- `WaAccountPanel.tsx` — info akun + tabel kontak dengan search box (nama/nomor) dan kolom "Foto".
+- `WaContactAvatar.tsx` — avatar lazy per kontak. `IntersectionObserver` (`rootMargin: '100px'`) menunda fetch sampai baris masuk viewport, lalu query `['wa','avatar',contactId]` GET `/api/wa/avatar`. Mantine `<Avatar>` fallback ke inisial nama bila `url` null.
 
 ## UI Conventions
 

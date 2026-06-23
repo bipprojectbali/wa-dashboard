@@ -21,8 +21,13 @@ Commands: `bun run db:migrate` | `bun run db:seed` | `bun run db:generate`
 | `Ticket` | id, title, description, status, priority, route?, reporterId, assigneeId?, timestamps, closedAt? |
 | `TicketComment` | id, ticketId, authorId?, authorTag, body, createdAt |
 | `TicketEvidence` | id, ticketId, kind, url, note?, createdAt |
+| `WaPolicy` | id (`global` singleton), allowFirstContact, maxPerMinute/Hour/Day, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, updatedAt, updatedById? |
 
 Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN`; `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
+
+`WaPolicy` adalah singleton (1 baris `id="global"`). Dibuat lazy lewat `getPolicy()`
+(upsert) — tidak perlu seed. Default aman out-of-the-box: `allowFirstContact=false`,
+`requireAck=true`, cap 3/menit·20/jam·100/hari. Lihat `docs/WA-POLICY.md`.
 
 ### Seed (`prisma/seed.ts`)
 
@@ -44,6 +49,13 @@ import { redis } from './lib/redis'
 | `ba:kv:active-sessions-<userId>` | `[{ token, expiresAt }]` — active session list | Better Auth |
 | `app:logs` | Redis List, max 500 entries (LTRIM) | `src/lib/applog.ts` |
 | `app:logs:next_id` | Auto-increment for log IDs | `src/lib/applog.ts` |
+| `wa:policy:cache` | Policy JSON, TTL 30s | `src/lib/wa-policy.ts` |
+| `wa:policy:ack:<userId>` | `{ version, at }` — ack kontrak tercatat | `src/lib/wa-policy.ts` |
+| `wa:known:<userId>` | JSON array chatId (kontak+chat), TTL 300s | `src/lib/wa-policy.ts` |
+| `wa:rl:last:<userId>` | epoch ms last send (min-interval) | `src/lib/wa-policy.ts` |
+| `wa:rl:recip:<userId>:<chatId>` | marker cooldown per nomor, TTL = cooldown | `src/lib/wa-policy.ts` |
+| `wa:rl:min\|hour\|day:<userId>` | counter kirim, TTL 60/3600/86400 | `src/lib/wa-policy.ts` |
+| `wa:avatar:<userId>:<contactId>` | URL foto profil kontak (string; `""` = tidak punya), TTL 3600s | `src/routes/wa.client.ts` |
 
 ### App Logs (`src/lib/applog.ts`)
 
@@ -58,5 +70,16 @@ Logs API requests via `onAfterResponse` hook (skips `/api/auth/*`). Auto-rotates
 ## Audit Logs (DB)
 
 Persistent user activity trail in `AuditLog` table.
-Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`
+Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`
 Auto-cleanup: records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) — runs on startup + every 24h.
+
+## WhatsApp API (wwebjs-api container)
+
+External REST container ([wwebjs-api](https://github.com/avoylenko/wwebjs-api)), bukan storage internal. Diakses via `src/lib/wa-client.ts` (server-side only).
+
+| Env | Default | Keterangan |
+|-----|---------|------------|
+| `WA_API_BASE_URL` | `''` (trailing slash dibuang) | Base URL container, mis. `https://wa-api.wibudev.com` |
+| `WA_API_KEY` | `''` | Disuntik sebagai header `x-api-key` — jangan commit nilainya, jangan kirim ke browser |
+
+`sessionId` di container = dashboard `user.id` (1 sesi WhatsApp per user). WS relay via `src/lib/wa-bridge.ts` (butuh `ENABLE_WEBSOCKET=true` di container; fallback polling bila tidak aktif).

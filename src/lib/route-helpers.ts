@@ -43,6 +43,20 @@ export function guardQcOrAdmin(authUser: AuthUser | null): Response | null {
   return null
 }
 
+export function guardAdmin(authUser: AuthUser | null): Response | null {
+  if (!authUser)
+    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  if (authUser.blocked || !['ADMIN', 'SUPER_ADMIN'].includes(authUser.role))
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  return null
+}
+
 export function guardAuth(authUser: AuthUser | null): Response | null {
   if (!authUser)
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {

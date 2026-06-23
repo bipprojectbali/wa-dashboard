@@ -31,6 +31,8 @@ const calls: Call[] = [
   { name: 'redis_get', args: { key: 'mcp:test:key' } },
   { name: 'redis_keys', args: { pattern: 'mcp:test:*', limit: 10 } },
   { name: 'redis_del', args: { keys: ['mcp:test:key'] } },
+  { name: 'wa_policy_get' },
+  { name: 'wa_policy_usage', args: { userId: 'mcp-test-user' } },
   // admin / write (transactional — we create then clean up)
   { name: 'admin_create_user', args: { name: 'MCP Tester', email: `mcp-test-${Date.now()}@example.com`, password: 'testpass123', role: 'USER' } },
 ]

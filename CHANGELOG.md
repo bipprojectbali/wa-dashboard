@@ -5,6 +5,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Foto profil kontak WhatsApp** di tab "Info Akun" (`/wa?tab=account`) — avatar dimuat lazy per baris yang masuk viewport (`IntersectionObserver`), dengan fallback inisial nama untuk nomor tanpa foto. Endpoint `GET /api/wa/avatar?contactId=...` mem-proxy `getProfilePicUrl` dan men-cache hasil di Redis (`wa:avatar:<userId>:<contactId>`, TTL 1 jam). MCP tools `wa_avatar` (dev) + `stg_wa_avatar` (staging).
+- **WhatsApp anti-ban policy ("kontrak sumpah pengikat")** — kontrak terdokumentasi + enforcement teknis nyata di `POST /api/wa/send`: wajib acknowledge kontrak, blokir kirim-duluan (first-contact) ke nomor non-kontak, jeda minimum antar pesan, cooldown per nomor, dan plafon volume menit/jam/hari. Pelanggaran → 403 (kebijakan) / 429 (rate limit) + audit `WA_SEND_BLOCKED`.
+- Halaman **Aturan & Kontrak** di `/wa?tab=policy` — baca kontrak, acknowledge, lihat kuota pakai, dan (SUPER_ADMIN) atur policy global.
+- **Pembatalan persetujuan kontrak** — tombol "Batalkan persetujuan" di `WaContractView` (modal konfirmasi) + endpoint `DELETE /api/wa/policy/ack` (audit `WA_POLICY_ACK_REVOKED`). Setelah dibatalkan, pengiriman kembali diblokir sampai disetujui ulang.
+- Endpoint `GET/PUT /api/wa/policy` + `POST /api/wa/policy/ack`; model Prisma singleton `WaPolicy` (global, persist di Postgres).
+- Mode OTP (first-contact) sebagai escape-hatch SUPER_ADMIN, **default MATI** — aman out-of-the-box, aktivasi tercatat di audit `WA_POLICY_UPDATED`.
+- MCP tools `wa_policy_get` / `wa_policy_usage` / `wa_policy_set` (dev) dan `stg_wa_policy` (staging).
+- Dokumentasi kontrak lengkap di `docs/WA-POLICY.md`.
+
 ### Changed
 - Brand renamed from Base Template → **WA Dashboard**; project reinitialized from base-template2
 - Remove unused dependencies: Three.js, React Three Fiber, D3, TanStack Router Vite plugin

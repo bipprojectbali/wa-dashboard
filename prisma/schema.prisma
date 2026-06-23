@@ -170,3 +170,21 @@ model TicketEvidence {
   @@index([ticketId])
   @@map("ticket_evidence")
 }
+
+// Singleton global config (id selalu "global") yang menegakkan aturan anti-ban
+// pada pengiriman pesan WhatsApp lewat wwebjs-api (klien tidak resmi, rawan ban).
+model WaPolicy {
+  id                          String   @id @default("global")
+  allowFirstContact           Boolean  @default(false)
+  maxPerMinute                Int      @default(3)
+  maxPerHour                  Int      @default(20)
+  maxPerDay                   Int      @default(100)
+  minIntervalSeconds          Int      @default(8)
+  perRecipientCooldownSeconds Int      @default(60)
+  requireAck                  Boolean  @default(true)
+  contractVersion             Int      @default(1)
+  updatedAt                   DateTime @updatedAt
+  updatedById                 String?
+
+  @@map("wa_policy")
+}

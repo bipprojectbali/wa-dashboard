@@ -82,5 +82,72 @@ export function registerInspectTools(server: McpServer) {
       ),
   )
 
+  server.registerTool(
+    'stg_wa_sessions',
+    {
+      title: 'STG: WA sessions',
+      description: 'List active WhatsApp sessions on staging via the wa_sessions MCP tool (readonly).',
+      inputSchema: z.object({}),
+    },
+    async () =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_sessions', input: {} }),
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'stg_wa_status',
+    {
+      title: 'STG: WA session status',
+      description: 'Get WhatsApp session state for a user id on staging via the wa_status MCP tool (readonly).',
+      inputSchema: z.object({ userId: z.string().min(1).describe('WA session id (= dashboard user id)') }),
+    },
+    async ({ userId }) =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_status', input: { userId } }),
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'stg_wa_avatar',
+    {
+      title: 'STG: WA contact avatar',
+      description: 'Get a contact profile picture URL on staging via the wa_avatar MCP tool (readonly).',
+      inputSchema: z.object({
+        userId: z.string().min(1).describe('WA session id (= dashboard user id)'),
+        contactId: z.string().min(1).describe('Contact chat id, e.g. 628xxx@c.us'),
+      }),
+    },
+    async ({ userId, contactId }) =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_avatar', input: { userId, contactId } }),
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'stg_wa_policy',
+    {
+      title: 'STG: WA anti-ban policy',
+      description: 'Get the global anti-ban policy config on staging via the wa_policy_get MCP tool (readonly).',
+      inputSchema: z.object({}),
+    },
+    async () =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_policy_get', input: {} }),
+        }),
+      ),
+  )
+
   registerInspectDataTools(server)
 }

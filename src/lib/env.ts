@@ -26,4 +26,6 @@ export const env = {
   AUDIT_LOG_RETENTION_DAYS: parseInt(optional('AUDIT_LOG_RETENTION_DAYS', '90'), 10),
   MCP_SECRET: optional('MCP_SECRET', ''),
   MCP_SECRET_ADMIN: optional('MCP_SECRET_ADMIN', ''),
+  WA_API_BASE_URL: optional('WA_API_BASE_URL', '').replace(/\/$/, ''),
+  WA_API_KEY: optional('WA_API_KEY', ''),
 } as const
