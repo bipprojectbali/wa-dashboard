@@ -36,16 +36,14 @@ const queryClient = new QueryClient({
 
 export function App() {
   return (
-    <>
-      <MantineProvider theme={theme} defaultColorScheme="auto">
-        <Notifications position="top-right" />
-        <ModalsProvider>
-          <QueryClientProvider client={queryClient}>
-            <WhatsNewModal />
-            <RouterProvider router={router} context={{ queryClient }} />
-          </QueryClientProvider>
-        </ModalsProvider>
-      </MantineProvider>
-    </>
+    <MantineProvider theme={theme} defaultColorScheme="auto">
+      <Notifications position="top-right" />
+      <ModalsProvider>
+        <QueryClientProvider client={queryClient}>
+          <WhatsNewModal />
+          <RouterProvider router={router} context={{ queryClient }} />
+        </QueryClientProvider>
+      </ModalsProvider>
+    </MantineProvider>
   )
 }

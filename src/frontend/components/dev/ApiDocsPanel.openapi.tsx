@@ -9,6 +9,7 @@ export function OpenApiJsonViewer({ url, refreshKey }: { url: string; refreshKey
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey is the intended trigger to refetch, not read in the effect body
   useEffect(() => {
     const fetchData = async () => {
       try {

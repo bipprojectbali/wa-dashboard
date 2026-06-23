@@ -104,8 +104,8 @@ export function WhatsNewModal() {
               {section}
             </Badge>
             <List size="sm" spacing={4}>
-              {items!.map((item, idx) => (
-                <List.Item key={idx}>{item}</List.Item>
+              {items!.map((item) => (
+                <List.Item key={`${section}:${item}`}>{item}</List.Item>
               ))}
             </List>
           </Stack>

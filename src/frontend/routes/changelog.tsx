@@ -143,8 +143,8 @@ function ChangelogPage() {
                             {section}
                           </Badge>
                           <Stack gap={2}>
-                            {items!.map((item, idx) => (
-                              <Group key={idx} gap="xs" align="flex-start" wrap="nowrap">
+                            {items!.map((item) => (
+                              <Group key={`${section}:${item}`} gap="xs" align="flex-start" wrap="nowrap">
                                 <Text size="xs" c="dimmed" mt={2} style={{ flexShrink: 0 }}>
                                   •
                                 </Text>

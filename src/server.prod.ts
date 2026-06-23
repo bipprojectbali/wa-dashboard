@@ -18,7 +18,7 @@ const API_PREFIXES = ['/api/', '/health', '/mcp', '/ws/']
 
 function isApiRoute(pathname: string): boolean {
   return API_PREFIXES.some((p) =>
-    p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(p + '/'),
+    p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`),
   )
 }
 

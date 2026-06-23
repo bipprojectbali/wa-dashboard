@@ -156,7 +156,7 @@ export async function runMigrations(options?: MigrateOptions): Promise<void> {
     const all = await listMigrations(migrationsDir)
 
     if (all.length === 0) {
-      log('✓ No migration files found in ' + migrationsDir)
+      log(`✓ No migration files found in ${migrationsDir}`)
       return
     }
 

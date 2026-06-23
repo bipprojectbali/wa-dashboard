@@ -26,6 +26,7 @@ export function FileHealthTable({
   onCopyPath,
 }: Props) {
   const [page, setPage] = useState(1)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filtered is the intended trigger to reset pagination, not read in the effect body
   useEffect(() => {
     setPage(1)
   }, [filtered])

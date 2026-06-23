@@ -44,6 +44,7 @@ export function AppLogsPanel() {
   const safePage = Math.min(page, totalPages)
   const pagedLogs = ordered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: levelFilter is the intended trigger to reset pagination, not read in the effect body
   useEffect(() => {
     setPage(1)
   }, [levelFilter])

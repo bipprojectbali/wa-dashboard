@@ -49,6 +49,7 @@ export function UserLogsPanel() {
   const safePage = Math.min(page, totalPages)
   const pagedLogs = logs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filters are the intended triggers to reset pagination, not read in the effect body
   useEffect(() => {
     setPage(1)
   }, [actionFilter, userFilter])
