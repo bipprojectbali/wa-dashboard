@@ -34,12 +34,12 @@ export function App() {
   return (
     <MantineProvider theme={theme} defaultColorScheme="auto">
       <Notifications position="top-right" />
-      <ModalsProvider>
-        <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <ModalsProvider>
           <WhatsNewModal />
           <RouterProvider router={router} context={{ queryClient }} />
-        </QueryClientProvider>
-      </ModalsProvider>
+        </ModalsProvider>
+      </QueryClientProvider>
     </MantineProvider>
   )
 }
