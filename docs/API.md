@@ -96,6 +96,23 @@ Policy = singleton DB (`wa_policy` id `global`). Detail lengkap kontrak & field:
 
 Frontend: route `/wa` (`src/frontend/routes/wa.tsx`), panel di `src/frontend/components/wa/`.
 
+### Operator WA Sessions (SUPER_ADMIN)
+
+Panel operator di `/dev` untuk melihat **semua** sesi raw di container (termasuk sesi
+orphan yang tak ter-map ke user dashboard) + terminate manual. Berbeda dari `/api/wa/*`
+per-user, endpoint ini **sengaja menerima `sessionId` dari input** (bukan `authUser.id`)
+agar bisa menjangkau sesi orphan — satu-satunya endpoint WA yang begitu, dijaga ketat
+`guardSuperAdmin` + audit. Logika enrichment di `src/lib/wa-sessions.ts` (sumber tunggal,
+dipakai juga MCP `wa_sessions_detail`).
+
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| GET | `/api/admin/wa-sessions` | guardSuperAdmin | List semua sesi container ter-enrich: `{ sessions: WaSessionInfo[], summary: { total, connected, orphan } }`. Tiap sesi: status koneksi (`getStatus`), nomor **ter-mask** + nama (`getClassInfo`), flag `orphan` (tidak match user DB). Sesi yang gagal di-enrich (belum CONNECTED) degrade ke `phone:null,name:null`, bukan gagalkan list. |
+| POST | `/api/admin/wa-sessions/:id/terminate` | guardSuperAdmin | Logout + destroy sesi container by raw `:id`. Audit `WA_SESSION_TERMINATED` + `appLog('warn')`. 400 bila id kosong. |
+
+Nomor di-mask via `maskPhone` (`src/lib/wa-verify.ts`) sebelum keluar server — tak pernah
+mengirim digit penuh ke browser/MCP. `WaUpstreamError` propagate sebagai **502**.
+
 ## WhatsApp Inbound Verify API (WAV)
 
 Verifikasi kepemilikan nomor pola **inbound** (user kirim token ke nomor server,

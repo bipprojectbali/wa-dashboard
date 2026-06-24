@@ -32,12 +32,12 @@ file yang mendekati / melebihi batas di `docs/FILE-HEALTH.md`. Status:
 
 ## WhatsApp Tools (`scripts/mcp/tools/wa.ts`)
 
-Readonly (`wa-readonly`): `wa_status` (input `{ userId }`), `wa_sessions` (semua sesi aktif di container), `wa_account` (input `{ userId }` → getClassInfo), `wa_avatar` (input `{ userId, contactId }` → getProfilePicUrl), `wa_policy_get` (policy anti-ban global), `wa_policy_usage` (input `{ userId }` → kuota menit/jam/hari).
-Admin (`wa-admin`): `wa_terminate` (input `{ userId }` → logout + destroy sesi), `wa_policy_set` (partial update policy + invalidate cache).
+Readonly (`wa-readonly`): `wa_status` (input `{ userId }`), `wa_sessions` (semua sesi aktif di container, id mentah), `wa_sessions_detail` (input `{}` → semua sesi ter-enrich: status, nomor ter-mask, nama, flag orphan — pakai `listWaSessions` dari `src/lib/wa-sessions.ts`, view operator), `wa_account` (input `{ userId }` → getClassInfo), `wa_avatar` (input `{ userId, contactId }` → getProfilePicUrl), `wa_policy_get` (policy anti-ban global), `wa_policy_usage` (input `{ userId }` → kuota menit/jam/hari).
+Admin (`wa-admin`): `wa_terminate` (input `{ userId }` → logout + destroy sesi by user id), `wa_session_terminate` (input `{ sessionId }` → terminate by raw container session id, termasuk sesi orphan), `wa_policy_set` (partial update policy + invalidate cache).
 
 `userId` = WA session id = dashboard user id. Semua memanggil container via `src/lib/wa-client.ts` (API key server-side).
 
-`debug-stg` pair (`scripts/mcp/tools/stg.inspect.ts`, readonly via HTTP `/mcp`): `stg_wa_sessions`, `stg_wa_status` (input `{ userId }`), `stg_wa_avatar` (input `{ userId, contactId }`), `stg_wa_policy` (policy anti-ban di STG).
+`debug-stg` pair (`scripts/mcp/tools/stg.inspect.ts`, readonly via HTTP `/mcp`): `stg_wa_sessions`, `stg_wa_sessions_detail` (input `{}` → GET `/api/admin/wa-sessions`, sesi ter-enrich + orphan, readonly), `stg_wa_status` (input `{ userId }`), `stg_wa_avatar` (input `{ userId, contactId }`), `stg_wa_policy` (policy anti-ban di STG).
 
 ## WhatsApp Inbound Verify Tools (`scripts/mcp/tools/wa-verify.ts`)
 

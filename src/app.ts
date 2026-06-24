@@ -14,6 +14,7 @@ import { swaggerPlugin } from './lib/swagger-config'
 import { adminInfoRouter } from './routes/admin/info'
 import { adminLogsRouter } from './routes/admin/logs'
 import { adminUsersRouter } from './routes/admin/users'
+import { adminWaSessionsRouter } from './routes/admin/wa-sessions'
 import { changelogRouter } from './routes/changelog'
 import { devAuthRouter } from './routes/dev-auth'
 import { llmsRouter } from './routes/llms'
@@ -44,6 +45,7 @@ export function createApp() {
       .use(adminUsersRouter)
       .use(adminLogsRouter)
       .use(adminInfoRouter)
+      .use(adminWaSessionsRouter)
       .use(ticketsRouter)
       .use(changelogRouter)
       .use(waRouter)

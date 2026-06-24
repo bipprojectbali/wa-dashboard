@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { prisma } from '../../../src/lib/db'
 import * as wa from '../../../src/lib/wa-client'
 import { getPolicy, getUsage, invalidatePolicyCache } from '../../../src/lib/wa-policy'
+import { listWaSessions, terminateWaSession } from '../../../src/lib/wa-sessions'
 import { errText, jsonText, type ToolModule } from './shared'
 
 const userIdInput = z.object({ userId: z.string().min(1).describe('WA session id (= dashboard user id)') })
@@ -36,6 +37,23 @@ export const waReadonlyTools: ToolModule = {
       async () => {
         try {
           return jsonText(await wa.getSessions())
+        } catch (e) {
+          return errText(e instanceof Error ? e.message : String(e))
+        }
+      },
+    )
+
+    server.registerTool(
+      'wa_sessions_detail',
+      {
+        title: 'WA sessions (enriched)',
+        description:
+          'List all container sessions enriched with status, masked phone, name, and orphan flag (operator view)',
+        inputSchema: z.object({}),
+      },
+      async () => {
+        try {
+          return jsonText(await listWaSessions())
         } catch (e) {
           return errText(e instanceof Error ? e.message : String(e))
         }
@@ -125,6 +143,22 @@ export const waAdminTools: ToolModule = {
       async ({ userId }) => {
         try {
           return jsonText(await wa.terminateSession(userId))
+        } catch (e) {
+          return errText(e instanceof Error ? e.message : String(e))
+        }
+      },
+    )
+
+    server.registerTool(
+      'wa_session_terminate',
+      {
+        title: 'Terminate WA session by raw id',
+        description: 'Terminate (logout + destroy) a container session by its raw sessionId (incl. orphan sessions)',
+        inputSchema: z.object({ sessionId: z.string().min(1).describe('Raw container session id') }),
+      },
+      async ({ sessionId }) => {
+        try {
+          return jsonText(await terminateWaSession(sessionId))
         } catch (e) {
           return errText(e instanceof Error ? e.message : String(e))
         }

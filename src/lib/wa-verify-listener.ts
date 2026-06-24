@@ -2,6 +2,7 @@ import { appLog } from './applog'
 import { prisma } from './db'
 import { env } from './env'
 import * as wa from './wa-client'
+import { extractSessionIds } from './wa-sessions'
 import { handleInbound } from './wa-verify'
 
 // Supervisor capture WAV: listener WhatsApp always-on, lepas dari browser.
@@ -26,24 +27,6 @@ let started = false
 function wsUrl(sessionId: string): string {
   const base = env.WA_API_BASE_URL.replace(/^http/, 'ws')
   return `${base}/ws/${sessionId}`
-}
-
-// Ekstrak daftar session id dari respons container yang bentuknya bisa beragam:
-// array string, array { name }, array { sessionId }, atau { sessions: [...] }.
-function extractSessionIds(raw: unknown): string[] {
-  const arr = Array.isArray(raw) ? raw : (raw as { sessions?: unknown })?.sessions
-  if (!Array.isArray(arr)) return []
-  const out: string[] = []
-  for (const item of arr) {
-    if (typeof item === 'string') {
-      out.push(item)
-    } else if (item && typeof item === 'object') {
-      const o = item as { name?: unknown; sessionId?: unknown; id?: unknown }
-      const id = o.name ?? o.sessionId ?? o.id
-      if (typeof id === 'string') out.push(id)
-    }
-  }
-  return out
 }
 
 // Validasi session id terhadap DB: hanya user ADMIN/SUPER_ADMIN & tidak diblokir

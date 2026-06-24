@@ -95,6 +95,14 @@ File Health tab (`?tab=file-health`): scan seluruh file project, hitung line/cha
 `docs/FILE-HEALTH.md`, tampilkan status (ok/warn/critical/exempt) + worst offenders + progress bar.
 Component: `src/frontend/components/dev/FileHealthPanel.tsx`. Endpoint: `GET /api/admin/file-health`.
 
+WA Sessions tab (`?tab=wa-sessions`, icon `TbBrandWhatsapp`): panel operator SUPER_ADMIN
+untuk melihat **semua** sesi raw di container WhatsApp (termasuk sesi orphan) + terminate
+manual per sesi. Query `['admin','wa-sessions']` GET `/api/admin/wa-sessions` (refetch 10s).
+Tabel: Session ID (truncate + tooltip, monospace), Status (badge hijau bila connected),
+Nomor (sudah ter-mask dari server), Nama, Mapped (badge oranye `orphan` atau email user),
+Aksi Terminate (`modals.openConfirmModal` merah → POST `/api/admin/wa-sessions/:id/terminate`).
+Badge ringkasan total/connected/orphan. Component: `src/frontend/components/dev/WaSessionsPanel.tsx`.
+
 ## Dev Tools
 
 - Click-to-source: `Ctrl+Shift+Cmd+C` — custom Vite plugin (`src/vite.ts`) injects `data-inspector-*` attrs

@@ -99,6 +99,17 @@ export function registerInspectTools(server: McpServer) {
   )
 
   server.registerTool(
+    'stg_wa_sessions_detail',
+    {
+      title: 'STG: WA sessions (enriched)',
+      description:
+        'List all container sessions on staging enriched with status, masked phone, name, and orphan flag via GET /api/admin/wa-sessions (SUPER_ADMIN cookie, falls back to MCP bearer). Readonly.',
+      inputSchema: z.object({}),
+    },
+    async () => stgResult(await stgFetch('/api/admin/wa-sessions')),
+  )
+
+  server.registerTool(
     'stg_wa_status',
     {
       title: 'STG: WA session status',

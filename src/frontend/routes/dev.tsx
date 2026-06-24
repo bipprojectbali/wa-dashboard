@@ -51,6 +51,7 @@ import { PlaceholderPanel } from '@/frontend/components/dev/PlaceholderPanel'
 import { ProjectPanel } from '@/frontend/components/dev/ProjectPanel'
 import { UserLogsPanel } from '@/frontend/components/dev/UserLogsPanel'
 import { UsersPanel } from '@/frontend/components/dev/UsersPanel'
+import { WaSessionsPanel } from '@/frontend/components/dev/WaSessionsPanel'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { openWhatsNew } from '@/frontend/components/WhatsNewModal'
@@ -68,6 +69,7 @@ const validTabs = [
   'project',
   'file-health',
   'api-docs',
+  'wa-sessions',
   'settings',
 ] as const
 
@@ -108,6 +110,7 @@ const navItems = [
   { label: 'Project', icon: TbSitemap, key: 'project' },
   { label: 'File Health', icon: TbRuler2, key: 'file-health' },
   { label: 'API Docs', icon: TbApi, key: 'api-docs' },
+  { label: 'WA Sessions', icon: TbBrandWhatsapp, key: 'wa-sessions' },
   { label: 'Settings', icon: TbSettings, key: 'settings' },
 ]
 
@@ -426,6 +429,7 @@ function DevPage() {
         {active === 'project' && <ProjectPanel />}
         {active === 'file-health' && <FileHealthPanel />}
         {active === 'api-docs' && <ApiDocsPanel />}
+        {active === 'wa-sessions' && <WaSessionsPanel />}
         {active === 'settings' && (
           <PlaceholderPanel title="Settings" desc="System configuration akan ditampilkan di sini." icon={TbSettings} />
         )}
