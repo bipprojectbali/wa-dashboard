@@ -48,6 +48,14 @@ Admin (`wa-verify-admin`): `wa_verify_replay` (input `{ id }` → replay webhook
 
 `debug-stg` pair (readonly via HTTP `/mcp`): `stg_wa_verify_consumers`, `stg_wa_verify_requests` (input `{ limit? }`), `stg_wa_verify_inbound` (input `{ limit? }`). Lihat `docs/WA-VERIFY.md`.
 
+## WhatsApp Verify E2E Tools (`scripts/mcp/tools/wa-verify-e2e.ts`)
+
+Orkestrasi uji alur WAV nyata dengan men-spawn binary `hurl` atas file
+`hurl/wa-verify/*.hurl` (sumber tunggal yang juga dibaca manusia). Pola
+human-in-the-loop: langkah kirim token via WhatsApp tak bisa diotomatiskan agent.
+
+Admin (`wa-verify-e2e`, dev saja): `wa_verify_e2e_start` (input `{ apiKey, expectedPhone?, baseUrl?, timeoutMs? }` → spawn `start.hurl`, balas `{ requestId, token, sendTo, mode, nextStep }`), `wa_verify_e2e_poll` (input `{ requestId, apiKey, baseUrl?, timeoutMs? }` → spawn `poll.hurl`, balas `{ status, verified, note }`). Degrade rapi bila `hurl` tak terinstall (kembalikan instruksi install). Pasangan `debug-stg` ditunda sebagai follow-up. Lihat `docs/WA-VERIFY.md` seksi "E2E testing".
+
 ## HTTP Fallback
 
 `POST /mcp` — readonly with `MCP_SECRET` bearer, full with `MCP_SECRET_ADMIN`

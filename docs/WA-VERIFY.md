@@ -230,8 +230,54 @@ Komponen di `src/frontend/components/wa/`: `WaVerifyPanel` (orchestrator),
 `WaVerifyConsumers` (CRUD + apiKey modal sekali-tampil), `WaVerifyLogs` (request +
 replay), `WaVerifyInbound` (raw log, SUPER_ADMIN saja). Lihat `docs/FRONTEND.md`.
 
+## E2E testing (Hurl + MCP)
+
+Uji alur WAV di dunia nyata via file `.hurl` yang **dibaca manusia sekaligus
+dieksekusi tool** — satu sumber kebenaran, nol duplikasi logika alur.
+
+### File `.hurl` (`hurl/wa-verify/`)
+
+- `start.hurl` — langkah 1: `POST /api/verify/start` (assert token format +
+  capture `request_id`/`wav_token`/`send_to`).
+- `poll.hurl` — langkah 3: `GET /api/verify/:id` dengan retry built-in (3s × 100 ≈
+  TTL 5 menit), assert `status == VERIFIED`.
+
+Semua nilai diinjeksi via `--variable` (base_url, api_key, expected_phone,
+request_id) — **tak ada secret di file**. Jalankan manual:
+
+```bash
+hurl --variable base_url=http://localhost:3111 \
+     --variable api_key=wav_sk_xxx \
+     --variable expected_phone=628123456789 \
+     hurl/wa-verify/start.hurl
+# kirim token via WhatsApp ke send_to, lalu:
+hurl --variable base_url=http://localhost:3111 \
+     --variable api_key=wav_sk_xxx \
+     --variable request_id=<id> \
+     hurl/wa-verify/poll.hurl
+```
+
+### Human-in-the-loop (langkah 2 tak bisa diotomatiskan)
+
+Langkah inbound — manusia **fisik mengirim** `WAV-XXXXXXXX` via WhatsApp ke nomor
+server — tak bisa dijalankan agent. Tool MCP berpola **start → (pause: manusia kirim)
+→ poll**: `wa_verify_e2e_start` balas token + instruksi eksplisit lalu berhenti; agent
+menunggu konfirmasi manusia sebelum `wa_verify_e2e_poll`.
+
+### Prasyarat: install `hurl`
+
+`hurl` adalah binary standalone (libcurl), **bukan** paket npm/bun — tak ada di
+`package.json`. Install: `brew install hurl` (macOS) / lihat
+<https://hurl.dev/docs/installation.html>. Tool MCP degrade rapi bila absen
+(kembalikan instruksi install, tidak crash) — kontributor tanpa hurl tetap bisa
+menjalankan unit test parser.
+
 ## MCP
 
 Tools inspeksi: `wa_verify_consumers`/`wa_verify_requests`/`wa_verify_inbound`
 (readonly) + `wa_verify_replay` (admin) di dev; `stg_wa_verify_consumers`/
-`stg_wa_verify_requests`/`stg_wa_verify_inbound` di staging. Lihat `docs/MCP.md`.
+`stg_wa_verify_requests`/`stg_wa_verify_inbound` di staging.
+
+E2E real-world (admin, dev): `wa_verify_e2e_start` (spawn `start.hurl` → token +
+nextStep) + `wa_verify_e2e_poll` (spawn `poll.hurl` → status VERIFIED). Pasangan
+`debug-stg` ditunda sebagai follow-up. Lihat `docs/MCP.md`.
