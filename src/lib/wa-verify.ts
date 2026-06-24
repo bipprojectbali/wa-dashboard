@@ -1,0 +1,136 @@
+import { randomBytes } from 'node:crypto'
+import { appLog } from './applog'
+import { prisma } from './db'
+
+// WhatsApp Inbound Verify (WAV) — matcher. Listener menyerahkan tiap pesan masuk
+// ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Capture-only:
+// TIDAK PERNAH membalas ke user (anti-ban) dan TIDAK menyentuh wa-policy (gate outbound).
+
+// Alfabet base32 tanpa karakter ambigu (tanpa 0/1/8/9, O/I/L/B). Token = WAV- + 8 char.
+const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ234567'
+const TOKEN_LEN = 8
+const TOKEN_REGEX = /\bWAV-[0-9A-Z]{8}\b/
+export const TOKEN_TTL_MS = 5 * 60 * 1000 // 5 menit
+
+export function generateToken(): string {
+  const bytes = randomBytes(TOKEN_LEN)
+  let out = ''
+  for (let i = 0; i < TOKEN_LEN; i++) {
+    out += TOKEN_ALPHABET[bytes[i]! % TOKEN_ALPHABET.length]
+  }
+  return `WAV-${out}`
+}
+
+// Cari token dalam isi pesan. Mengembalikan token utuh (mis. "WAV-ABCD2345") atau null.
+export function extractToken(body: string | null | undefined): string | null {
+  if (!body) return null
+  const m = body.match(TOKEN_REGEX)
+  return m ? m[0] : null
+}
+
+// Buang suffix WA (@c.us / @g.us) → sisakan digit nomor.
+export function normalizePhone(from: string | null | undefined): string {
+  if (!from) return ''
+  return from.replace(/@.*$/, '').replace(/\D/g, '')
+}
+
+// Mask nomor untuk log/penyimpanan PII: tampilkan 3 awal + 4 akhir, sisanya '*'.
+// "6281234566789" → "628****6789". Nomor pendek di-mask penuh.
+export function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '')
+  if (digits.length <= 7) return '*'.repeat(digits.length)
+  const head = digits.slice(0, 3)
+  const tail = digits.slice(-4)
+  return `${head}${'*'.repeat(digits.length - 7)}${tail}`
+}
+
+interface InboundMessage {
+  from?: string
+  body?: string
+  fromMe?: boolean
+  id?: unknown
+}
+
+// id container bisa string atau objek { _serialized }. Ambil bentuk string aman.
+function extractMessageId(id: unknown): string | null {
+  if (typeof id === 'string') return id
+  if (id && typeof id === 'object') {
+    const s = (id as { _serialized?: unknown })._serialized
+    if (typeof s === 'string') return s
+  }
+  return null
+}
+
+export interface InboundResult {
+  matched: boolean
+  consumerId?: string
+  requestId?: string
+}
+
+// Proses satu pesan masuk. sessionId = WA session id (= dashboard user id).
+// Idempoten: updateMany dengan guard status=PENDING memastikan satu pemenang race.
+export async function handleInbound(sessionId: string, message: InboundMessage): Promise<InboundResult> {
+  // Abaikan pesan sendiri & non-personal (grup) di sini sebagai pertahanan berlapis;
+  // listener juga sudah memfilter, tapi matcher tetap defensif.
+  if (message.fromMe === true) return { matched: false }
+  const from = message.from ?? ''
+  if (!from.endsWith('@c.us')) return { matched: false }
+
+  const phone = normalizePhone(from)
+  const masked = maskPhone(phone)
+  const token = extractToken(message.body)
+
+  if (!token) {
+    await writeInboundLog(sessionId, masked, null, false, null)
+    return { matched: false }
+  }
+
+  const now = new Date()
+  const candidate = await prisma.verifyRequest.findFirst({
+    where: { token, status: 'PENDING', expiresAt: { gt: now } },
+    select: { id: true, consumerId: true },
+  })
+
+  if (!candidate) {
+    // Token berformat valid tapi tak ada request aktif (kadaluarsa / sudah dipakai / asing).
+    await writeInboundLog(sessionId, masked, token, false, null)
+    return { matched: false }
+  }
+
+  // Guard status=PENDING di updateMany → hanya satu pemenang walau pesan dobel.
+  const res = await prisma.verifyRequest.updateMany({
+    where: { id: candidate.id, status: 'PENDING', expiresAt: { gt: now } },
+    data: {
+      status: 'VERIFIED',
+      matchedPhone: phone,
+      matchedMessageId: extractMessageId(message.id),
+      verifiedAt: now,
+    },
+  })
+
+  const won = res.count === 1
+  await writeInboundLog(sessionId, masked, token, won, candidate.consumerId)
+
+  if (won) {
+    appLog('info', 'WA verify matched', `consumer=${candidate.consumerId} from=${masked}`).catch(() => {})
+    // Picu webhook async (best-effort). Dynamic import memutus circular dependency
+    // dengan listener/boot dan menjaga matcher tetap murni.
+    import('./wa-verify-webhook')
+      .then((m) => m.deliverVerified(candidate.id))
+      .catch((e) => appLog('warn', 'WA verify webhook dispatch failed', String(e)).catch(() => {}))
+  }
+
+  return { matched: won, consumerId: candidate.consumerId, requestId: candidate.id }
+}
+
+async function writeInboundLog(
+  sessionId: string,
+  fromMasked: string,
+  tokenFound: string | null,
+  matched: boolean,
+  consumerId: string | null,
+): Promise<void> {
+  await prisma.verifyInboundLog
+    .create({ data: { sessionId, fromMasked, tokenFound, matched, consumerId } })
+    .catch((e) => appLog('warn', 'WA verify inbound log failed', String(e)).catch(() => {}))
+}

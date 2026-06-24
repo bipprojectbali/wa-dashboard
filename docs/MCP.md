@@ -39,6 +39,15 @@ Admin (`wa-admin`): `wa_terminate` (input `{ userId }` → logout + destroy sesi
 
 `debug-stg` pair (`scripts/mcp/tools/stg.inspect.ts`, readonly via HTTP `/mcp`): `stg_wa_sessions`, `stg_wa_status` (input `{ userId }`), `stg_wa_avatar` (input `{ userId, contactId }`), `stg_wa_policy` (policy anti-ban di STG).
 
+## WhatsApp Inbound Verify Tools (`scripts/mcp/tools/wa-verify.ts`)
+
+Inspeksi fitur WAV (verifikasi nomor inbound). Memanggil `prisma`/lib WAV langsung.
+
+Readonly (`wa-verify-readonly`): `wa_verify_consumers` (list consumer tanpa secret), `wa_verify_requests` (input `{ limit? }` → request terbaru, nomor ter-mask), `wa_verify_inbound` (input `{ limit? }` → raw inbound log, nomor ter-mask).
+Admin (`wa-verify-admin`): `wa_verify_replay` (input `{ id }` → replay webhook manual).
+
+`debug-stg` pair (readonly via HTTP `/mcp`): `stg_wa_verify_consumers`, `stg_wa_verify_requests` (input `{ limit? }`), `stg_wa_verify_inbound` (input `{ limit? }`). Lihat `docs/WA-VERIFY.md`.
+
 ## HTTP Fallback
 
 `POST /mcp` — readonly with `MCP_SECRET` bearer, full with `MCP_SECRET_ADMIN`

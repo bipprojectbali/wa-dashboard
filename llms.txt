@@ -87,6 +87,8 @@ CHANGELOG.md, and the docs/ folder. Edit those sources instead.
 - **Role**: USER | QC | ADMIN | SUPER_ADMIN
 - **TicketStatus**: OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED
 - **TicketPriority**: LOW | MEDIUM | HIGH | CRITICAL
+- **VerifyStatus**: PENDING | VERIFIED | EXPIRED
+- **VerifyDelivery**: PENDING | DELIVERED | FAILED | DISABLED
 
 ### Models
 - **User** (table `user`): id, name, email, emailVerified, image, password, role, blocked, createdAt, updatedAt, sessions, accounts, auditLogs, reported, assigned, comments
@@ -98,6 +100,9 @@ CHANGELOG.md, and the docs/ folder. Edit those sources instead.
 - **TicketComment** (table `ticket_comment`): id, ticketId, authorId, authorTag, body, createdAt, ticket, author
 - **TicketEvidence** (table `ticket_evidence`): id, ticketId, kind, url, note, createdAt, ticket
 - **WaPolicy** (table `wa_policy`): id, allowFirstContact, maxPerMinute, maxPerHour, maxPerDay, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, updatedAt, updatedById
+- **VerifyConsumer** (table `verify_consumer`): id, name, apiKeyHash, apiKeyPrefix, webhookUrl, webhookSecret, active, createdById, createdAt, updatedAt, requests
+- **VerifyRequest** (table `verify_request`): id, consumerId, token, expectedPhone, status, matchedPhone, matchedMessageId, expiresAt, verifiedAt, deliveryStatus, deliveryAttempts, lastDeliveryAt, lastDeliveryError, createdAt, consumer
+- **VerifyInboundLog** (table `verify_inbound_log`): id, sessionId, fromMasked, tokenFound, matched, consumerId, createdAt
 
 ## Environment Variables
 - `DATABASE_URL` (required) — PostgreSQL connection string

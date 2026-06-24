@@ -7,6 +7,9 @@ import * as wa from '../lib/wa-client'
 import { checkAndConsume } from '../lib/wa-policy'
 
 const AVATAR_TTL = 3600
+// Kegagalan upstream di-cache lebih pendek: nomor tanpa foto / @lid tak spam
+// upstream, tapi container yang sempat down pulih dalam menit, bukan jam.
+const AVATAR_ERROR_TTL = 300
 const avatarKey = (userId: string, contactId: string) => `wa:avatar:${userId}:${contactId}`
 
 // sessionId is ALWAYS the authenticated user's id — never taken from input.
@@ -53,10 +56,18 @@ export const waClientRouter = new Elysia({ tags: ['WA'] })
       const key = avatarKey(userId, query.contactId)
       const cached = await redis.get(key).catch(() => null)
       if (cached !== null) return { url: cached || null }
-      const res = await wa.getProfilePicUrl(userId, query.contactId)
-      const url = res.result ?? ''
-      redis.set(key, url, 'EX', AVATAR_TTL).catch(() => {})
-      return { url: url || null }
+      // Avatar = data best-effort per-nomor. Container membalas error untuk kasus
+      // normal (nomor tanpa foto, foto privat, non-WA, identifier @lid) — degrade
+      // ke url:null alih-alih menggagalkan request dengan 502.
+      try {
+        const res = await wa.getProfilePicUrl(userId, query.contactId)
+        const url = res.result ?? ''
+        redis.set(key, url, 'EX', AVATAR_TTL).catch(() => {})
+        return { url: url || null }
+      } catch {
+        redis.set(key, '', 'EX', AVATAR_ERROR_TTL).catch(() => {})
+        return { url: null }
+      }
     },
     {
       detail: { summary: 'WA contact profile picture URL', security: [{ cookieAuth: [] }] },

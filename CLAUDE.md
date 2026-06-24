@@ -37,6 +37,23 @@ bun run test:integration  # tests/integration/ — API via app.handle(), no serv
 
 Helpers in `tests/helpers.ts`: `createTestApp()`, `seedTestUser()`, `createTestSession()`, `cleanupTestData()`
 
+### Isolasi DB Test (Wajib)
+
+Test berjalan terhadap **database terpisah**, bukan DB dev. `tests/setup.ts` (di-preload
+via `bunfig.toml` `[test].preload`) menukar `DATABASE_URL` → `TEST_DATABASE_URL` sebelum
+`src/lib/db.ts` membacanya. Tanpa ini, test yang menulis singleton (mis. `WaPolicy`
+`id="global"`) akan mencemari data dev — gejalanya: setting di UI "kembali sendiri"
+setelah `bun test` jalan.
+
+Setup sekali per mesin:
+```bash
+createdb wa-dashboard-test   # atau: psql -c 'CREATE DATABASE "wa-dashboard-test"'
+DATABASE_URL=<test-url> bunx --bun prisma migrate deploy   # apply skema ke DB test
+```
+Set `TEST_DATABASE_URL` di `.env` (lihat `.env.example`). Preload menolak jalan bila
+`TEST_DATABASE_URL` kosong atau sama dengan `DATABASE_URL`. Saat menambah migration baru,
+jalankan `migrate deploy` di atas agar DB test ikut sinkron.
+
 ## Database
 
 ```bash

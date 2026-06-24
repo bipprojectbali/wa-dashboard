@@ -29,6 +29,19 @@ enum TicketPriority {
   CRITICAL
 }
 
+enum VerifyStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+}
+
+enum VerifyDelivery {
+  PENDING
+  DELIVERED
+  FAILED
+  DISABLED
+}
+
 model User {
   id            String   @id @default(uuid())
   name          String
@@ -187,4 +200,65 @@ model WaPolicy {
   updatedById                 String?
 
   @@map("wa_policy")
+}
+
+// App-consumer terdaftar untuk WhatsApp Inbound Verify (WAV). Tiap consumer =
+// satu app eksternal; isolasi antar app ditegakkan lewat apiKeyHash (consumerId
+// selalu diturunkan dari API key, tidak pernah dari input).
+model VerifyConsumer {
+  id            String   @id @default(uuid())
+  name          String
+  apiKeyHash    String   @unique
+  apiKeyPrefix  String
+  webhookUrl    String?
+  webhookSecret String
+  active        Boolean  @default(true)
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  requests VerifyRequest[]
+
+  @@map("verify_consumer")
+}
+
+// Satu permintaan verifikasi nomor. id dipakai sebagai polling id (sumber
+// kebenaran). Token one-time dicocokkan dengan pesan WA masuk oleh listener.
+model VerifyRequest {
+  id               String         @id @default(uuid())
+  consumerId       String
+  token            String         @unique
+  expectedPhone    String?
+  status           VerifyStatus   @default(PENDING)
+  matchedPhone     String?
+  matchedMessageId String?
+  expiresAt        DateTime
+  verifiedAt       DateTime?
+  deliveryStatus   VerifyDelivery @default(PENDING)
+  deliveryAttempts Int            @default(0)
+  lastDeliveryAt   DateTime?
+  lastDeliveryError String?
+  createdAt        DateTime       @default(now())
+
+  consumer VerifyConsumer @relation(fields: [consumerId], references: [id], onDelete: Cascade)
+
+  @@index([consumerId])
+  @@index([token])
+  @@index([status, expiresAt])
+  @@map("verify_request")
+}
+
+// Audit mentah tiap pesan WA masuk yang diperiksa listener (match/tidak).
+// Nomor selalu disimpan termask. Dibersihkan sweep > 24 jam.
+model VerifyInboundLog {
+  id         String   @id @default(uuid())
+  sessionId  String
+  fromMasked String
+  tokenFound String?
+  matched    Boolean  @default(false)
+  consumerId String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("verify_inbound_log")
 }

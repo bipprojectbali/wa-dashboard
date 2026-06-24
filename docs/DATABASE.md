@@ -22,12 +22,21 @@ Commands: `bun run db:migrate` | `bun run db:seed` | `bun run db:generate`
 | `TicketComment` | id, ticketId, authorId?, authorTag, body, createdAt |
 | `TicketEvidence` | id, ticketId, kind, url, note?, createdAt |
 | `WaPolicy` | id (`global` singleton), allowFirstContact, maxPerMinute/Hour/Day, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, updatedAt, updatedById? |
+| `VerifyConsumer` | id, name, apiKeyHash (unique), apiKeyPrefix, webhookUrl?, webhookSecret, active, createdById?, timestamps — app eksternal yang memakai WAV |
+| `VerifyRequest` | id (= polling id), consumerId, token (unique), expectedPhone?, status, matchedPhone?, matchedMessageId?, expiresAt, verifiedAt?, deliveryStatus, deliveryAttempts, lastDeliveryAt?, lastDeliveryError?, createdAt |
+| `VerifyInboundLog` | id, sessionId, fromMasked, tokenFound?, matched, consumerId?, createdAt — audit pesan masuk (nomor ter-mask) |
 
-Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN`; `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`
+Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN`; `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`; `VerifyStatus` = `PENDING | VERIFIED | EXPIRED`; `VerifyDelivery` = `PENDING | DELIVERED | FAILED | DISABLED`
 
 `WaPolicy` adalah singleton (1 baris `id="global"`). Dibuat lazy lewat `getPolicy()`
 (upsert) — tidak perlu seed. Default aman out-of-the-box: `allowFirstContact=false`,
 `requireAck=true`, cap 3/menit·20/jam·100/hari. Lihat `docs/WA-POLICY.md`.
+
+Model `Verify*` adalah fitur **WAV (WhatsApp Inbound Verification)**. `VerifyConsumer`
+= app eksternal terdaftar (API key di-hash, plaintext hanya sekali). `VerifyRequest`
+= satu sesi verifikasi (token one-time, status + delivery status webhook).
+`VerifyInboundLog` = audit mentah pesan masuk listener (nomor ter-mask, dibersihkan
+sweep ~24 jam). Tidak ada Redis key baru untuk WAV. Lihat `docs/WA-VERIFY.md`.
 
 ### Seed (`prisma/seed.ts`)
 
@@ -55,7 +64,7 @@ import { redis } from './lib/redis'
 | `wa:rl:last:<userId>` | epoch ms last send (min-interval) | `src/lib/wa-policy.ts` |
 | `wa:rl:recip:<userId>:<chatId>` | marker cooldown per nomor, TTL = cooldown | `src/lib/wa-policy.ts` |
 | `wa:rl:min\|hour\|day:<userId>` | counter kirim, TTL 60/3600/86400 | `src/lib/wa-policy.ts` |
-| `wa:avatar:<userId>:<contactId>` | URL foto profil kontak (string; `""` = tidak punya), TTL 3600s | `src/routes/wa.client.ts` |
+| `wa:avatar:<userId>:<contactId>` | URL foto profil kontak (string; `""` = tidak punya / upstream error), TTL 3600s sukses · 300s error | `src/routes/wa.client.ts` |
 
 ### App Logs (`src/lib/applog.ts`)
 
@@ -70,7 +79,7 @@ Logs API requests via `onAfterResponse` hook (skips `/api/auth/*`). Auto-rotates
 ## Audit Logs (DB)
 
 Persistent user activity trail in `AuditLog` table.
-Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`
+Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`, `WA_VERIFY_CONSUMER_CREATED`, `WA_VERIFY_CONSUMER_UPDATED`, `WA_VERIFY_CONSUMER_DELETED`, `WA_VERIFY_KEY_REGENERATED`, `WA_VERIFY_REPLAY`
 Auto-cleanup: records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) — runs on startup + every 24h.
 
 ## WhatsApp API (wwebjs-api container)

@@ -11,6 +11,7 @@ import { projectTools } from './tools/project'
 import { redisTools } from './tools/redis'
 import { ticketTools } from './tools/tickets'
 import { waAdminTools, waReadonlyTools } from './tools/wa'
+import { waVerifyAdminTools, waVerifyReadonlyTools } from './tools/wa-verify'
 import type { McpScope, ToolModule } from './tools/shared'
 
 export type { McpScope }
@@ -23,6 +24,7 @@ const READONLY_MODULES: ToolModule[] = [
   projectTools,
   codeTools,
   waReadonlyTools,
+  waVerifyReadonlyTools,
 ]
 
 const ADMIN_MODULES: ToolModule[] = [
@@ -33,6 +35,7 @@ const ADMIN_MODULES: ToolModule[] = [
   redisTools,
   ticketTools,
   waAdminTools,
+  waVerifyAdminTools,
 ]
 
 export function createMcpServer(scope: McpScope = 'admin'): McpServer {

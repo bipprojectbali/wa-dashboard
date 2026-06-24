@@ -61,6 +61,14 @@ beforeAll(async () => {
         return new Response(new Uint8Array([137, 80, 78, 71]), { headers: { 'content-type': 'image/png' } })
       }
       if (url.includes('/client/getProfilePicUrl/')) {
+        // Simulasikan container error untuk nomor tertentu (nomor tanpa foto /
+        // identifier @lid) — wwebjs-api membalas non-2xx, bukan { result: null }.
+        if (init?.body && typeof init.body === 'string' && init.body.includes('@lid')) {
+          return new Response(JSON.stringify({ success: false, error: 'profile pic not found' }), {
+            status: 500,
+            headers: { 'content-type': 'application/json' },
+          })
+        }
         return new Response(JSON.stringify({ success: true, result: 'https://pps.whatsapp.net/x.jpg' }), {
           headers: { 'content-type': 'application/json' },
         })
@@ -88,6 +96,7 @@ afterAll(async () => {
       `wa:rl:last:${adminId}`,
       `wa:known:${adminId}`,
       `wa:avatar:${adminId}:628999@c.us`,
+      `wa:avatar:${adminId}:100399860170781@lid`,
       'wa:policy:cache',
     )
     .catch(() => {})
@@ -319,6 +328,35 @@ describe('GET /api/wa/avatar', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.url).toBe('https://pps.whatsapp.net/x.jpg')
+    expect(waCalls.some((u) => u.includes('/client/getProfilePicUrl/'))).toBe(false)
+  })
+
+  test('degrades upstream error to 200 url:null (no 502) — e.g. @lid / no photo', async () => {
+    const lidContact = '100399860170781@lid'
+    await redis.del(`wa:avatar:${adminId}:${lidContact}`).catch(() => {})
+    waCalls = []
+    const res = await app.handle(
+      new Request(`http://localhost/api/wa/avatar?contactId=${encodeURIComponent(lidContact)}`, {
+        headers: { cookie: adminCookie },
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.url).toBeNull()
+    expect(waCalls.some((u) => u.endsWith(`/client/getProfilePicUrl/${adminId}`))).toBe(true)
+  })
+
+  test('cached upstream failure is not re-fetched', async () => {
+    const lidContact = '100399860170781@lid'
+    waCalls = []
+    const res = await app.handle(
+      new Request(`http://localhost/api/wa/avatar?contactId=${encodeURIComponent(lidContact)}`, {
+        headers: { cookie: adminCookie },
+      }),
+    )
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.url).toBeNull()
     expect(waCalls.some((u) => u.includes('/client/getProfilePicUrl/'))).toBe(false)
   })
 })

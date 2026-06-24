@@ -149,5 +149,54 @@ export function registerInspectTools(server: McpServer) {
       ),
   )
 
+  server.registerTool(
+    'stg_wa_verify_consumers',
+    {
+      title: 'STG: WA verify consumers',
+      description:
+        'List registered WAV (inbound verify) consumers on staging via the wa_verify_consumers MCP tool (readonly, no secrets).',
+      inputSchema: z.object({}),
+    },
+    async () =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_verify_consumers', input: {} }),
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'stg_wa_verify_requests',
+    {
+      title: 'STG: WA verify requests',
+      description: 'List recent WAV verify requests on staging via the wa_verify_requests MCP tool (readonly, phone masked).',
+      inputSchema: z.object({ limit: z.number().int().min(1).max(200).optional().describe('Max rows (default 50)') }),
+    },
+    async ({ limit }) =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_verify_requests', input: limit ? { limit } : {} }),
+        }),
+      ),
+  )
+
+  server.registerTool(
+    'stg_wa_verify_inbound',
+    {
+      title: 'STG: WA verify inbound log',
+      description: 'List raw WAV inbound capture log on staging via the wa_verify_inbound MCP tool (readonly, phone masked).',
+      inputSchema: z.object({ limit: z.number().int().min(1).max(200).optional().describe('Max rows (default 50)') }),
+    },
+    async ({ limit }) =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_verify_inbound', input: limit ? { limit } : {} }),
+        }),
+      ),
+  )
+
   registerInspectDataTools(server)
 }

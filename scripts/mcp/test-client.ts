@@ -33,6 +33,9 @@ const calls: Call[] = [
   { name: 'redis_del', args: { keys: ['mcp:test:key'] } },
   { name: 'wa_policy_get' },
   { name: 'wa_policy_usage', args: { userId: 'mcp-test-user' } },
+  { name: 'wa_verify_consumers' },
+  { name: 'wa_verify_requests', args: { limit: 5 } },
+  { name: 'wa_verify_inbound', args: { limit: 5 } },
   // admin / write (transactional — we create then clean up)
   { name: 'admin_create_user', args: { name: 'MCP Tester', email: `mcp-test-${Date.now()}@example.com`, password: 'testpass123', role: 'USER' } },
 ]

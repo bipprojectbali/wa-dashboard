@@ -22,7 +22,7 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 | `profile.tsx` | `profileRoute` | `/profile` | authenticated |
 | `blocked.tsx` | `blockedRoute` | `/blocked` | authenticated |
 | `changelog.tsx` | `changelogRoute` | `/changelog` | authenticated — full version history from `GET /api/changelog?all=true` |
-| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|policy) |
+| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|policy\|verify) |
 
 **Rule:** new route → (1) create file, (2) export `*Route` via `createRoute`, (3) add to `router.ts` `addChildren([...])`.
 
@@ -58,6 +58,14 @@ Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 Tab `?tab=account` ("Info Akun"):
 - `WaAccountPanel.tsx` — info akun + tabel kontak dengan search box (nama/nomor) dan kolom "Foto".
 - `WaContactAvatar.tsx` — avatar lazy per kontak. `IntersectionObserver` (`rootMargin: '100px'`) menunda fetch sampai baris masuk viewport, lalu query `['wa','avatar',contactId]` GET `/api/wa/avatar`. Mantine `<Avatar>` fallback ke inisial nama bila `url` null.
+
+Tab `?tab=verify` ("Verifikasi Nomor", icon `TbShieldCheck`, ADMIN+SUPER_ADMIN):
+- `WaVerifyPanel.tsx` — orchestrator, query `['wa','verify','consumers']` GET `/api/wa/verify/consumers`. Render `WaVerifyGuide` + `WaVerifyConsumers` + `WaVerifyLogs`; `WaVerifyInbound` hanya untuk SUPER_ADMIN (gate `isSuperAdmin`).
+- `WaVerifyGuide.tsx` — kartu panduan statis (tanpa data fetch): menjelaskan cara kerja WAV sebagai langkah berurutan (daftar consumer → start → user kirim token → server cocokkan → app terima hasil via polling/webhook) + penjelasan mode Login vs Discovery. Ringkasan dari `docs/WA-VERIFY.md`.
+- `WaVerifyConsumers.tsx` — list consumer + CRUD (create/edit/regenerate-key/toggle active/delete). Ikon **edit** (`TbPencil`) per row buka `openEditConsumerModal` (`WaVerifyConsumerEditModal.tsx`) untuk ubah name/webhookUrl via PUT `/api/wa/verify/consumers/:id`. **Regenerate = ambil ulang full key**: karena server hanya simpan hash (recopy plaintext mustahil), tombol `TbKey` pakai confirm modal lalu POST `.../regenerate-key` → key baru tampil sekali (key lama langsung batal). Modal apiKey **once-only** (`showApiKeyModal`): plaintext key hanya muncul sekali saat create/regen, dengan tombol salin + warning.
+- `WaVerifyLogs.tsx` — request terbaru (`['wa','verify','requests']`), badge `STATUS_COLOR` (status verifikasi) + `DELIVERY_COLOR` (status webhook), tombol replay (`canReplay`, SUPER_ADMIN) → POST `.../replay`. Nomor sudah ter-mask dari server.
+- `WaVerifyInbound.tsx` — raw inbound log (`['wa','verify','inbound']`, SUPER_ADMIN saja). Nomor ter-mask, token terdeteksi, kolom cocok ya/tidak.
+- `wa-verify.types.ts` — tipe `Consumer`, `ConsumersResponse`, `VerifyRequest`, `RequestsResponse`, `InboundResponse`.
 
 ## Data Fetching
 

@@ -71,7 +71,7 @@ export function WaSendPanel() {
           <Autocomplete
             label="Chat ID"
             placeholder="6281234567890@c.us"
-            description="Pilih dari kontak atau ketik manual. Format: nomor diawali kode negara, diakhiri @c.us"
+            description="Pilih dari kontak atau ketik manual. Format: nomor diawali kode negara diakhiri @c.us, atau identifier @lid"
             data={options}
             value={chatId}
             onChange={setChatId}

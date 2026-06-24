@@ -67,7 +67,11 @@ Guard: `guardAdmin(authUser)`. API key disuntik server-side di `src/lib/wa-clien
 nomor). `contactId` dari query, divalidasi `minLength: 1`. Hasil di-cache di Redis
 `wa:avatar:<userId>:<contactId>` (TTL 3600s); nomor tanpa foto disimpan sebagai marker
 string kosong agar tak memanggil upstream berulang, dan dikembalikan sebagai `url: null`.
-Frontend memuat avatar secara lazy per baris yang masuk viewport (`WaContactAvatar.tsx`).
+Avatar adalah data best-effort: bila container error untuk satu nomor (nomor tanpa foto,
+foto privat, non-WhatsApp, atau identifier `@lid`), handler **degrade ke `url: null`**
+(bukan 502) dan men-cache kegagalan dengan TTL pendek (300s) agar container yang sempat
+down pulih cepat. Frontend memuat avatar secara lazy per baris yang masuk viewport
+(`WaContactAvatar.tsx`).
 
 ### Enforcement anti-ban di `POST /api/wa/send`
 
@@ -91,6 +95,50 @@ Policy = singleton DB (`wa_policy` id `global`). Detail lengkap kontrak & field:
 `docs/WA-POLICY.md`.
 
 Frontend: route `/wa` (`src/frontend/routes/wa.tsx`), panel di `src/frontend/components/wa/`.
+
+## WhatsApp Inbound Verify API (WAV)
+
+Verifikasi kepemilikan nomor pola **inbound** (user kirim token ke nomor server,
+dashboard hanya menerima — aman dari kebijakan anti-ban OTP). Dipakai consumer app
+eksternal dengan **isolasi penuh** antar app. Kontrak lengkap: `docs/WA-VERIFY.md`.
+
+### Consumer-facing (auth: API key header `x-api-key`, BUKAN cookie)
+
+`consumerId` SELALU dari API key (hash lookup), tak pernah dari input. Query
+di-scope `consumerId` → request milik app lain 404 (bukti isolasi).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/verify/start` | Body `{ expectedPhone? }` → `{ id, token, sendTo, expiresAt, instruction }`. Token `WAV-` + 8 char, one-time, TTL 5 menit. 401 bila API key invalid/non-aktif; 503 bila gagal generate token. |
+| GET | `/api/verify/:id` | Poll `{ status, matchedPhone, verifiedAt, expiresAt }`. `status` ∈ PENDING/VERIFIED/EXPIRED (live-cek expiry). 404 untuk id milik consumer lain. |
+
+`expectedPhone` diisi = **login** (consumer bandingkan `matchedPhone` sendiri);
+kosong = **discovery** (nomor pengirim jadi nomor terverifikasi).
+
+### Management (auth: session cookie)
+
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| GET | `/api/wa/verify/consumers` | guardAdmin | List consumer (id, name, apiKeyPrefix, webhookUrl, active, `_count.requests`) + `canEdit` |
+| POST | `/api/wa/verify/consumers` | guardSuperAdmin | Buat consumer → `{ consumer, apiKey }`; **apiKey plaintext hanya muncul sekali**. Audit `WA_VERIFY_CONSUMER_CREATED` |
+| PUT | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Update name/webhookUrl/active (404 bila tak ada). Audit `WA_VERIFY_CONSUMER_UPDATED` |
+| POST | `/api/wa/verify/consumers/:id/regenerate-key` | guardSuperAdmin | Regen apiKey (balas sekali). Audit `WA_VERIFY_KEY_REGENERATED` |
+| DELETE | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Hapus consumer (cascade requests). Audit `WA_VERIFY_CONSUMER_DELETED` |
+| GET | `/api/wa/verify/requests` | guardAdmin | List request terbaru (`?limit` max 200), `matchedPhone` **ter-mask** |
+| GET | `/api/wa/verify/inbound` | guardSuperAdmin | Raw inbound log (`?limit` max 200) |
+| POST | `/api/wa/verify/requests/:id/replay` | guardSuperAdmin | Replay webhook (409 + `reason` bila gagal). Audit `WA_VERIFY_REPLAY` |
+
+### Webhook push ke consumer
+
+Saat match → `POST` ke `consumer.webhookUrl` (bila ada; jika tidak, mode
+polling-only). Payload `{ event: 'verify.succeeded', id, matchedPhone, expectedPhone,
+verifiedAt }` (token TIDAK disertakan; korelasi via `id`). Headers: `X-WAV-Signature:
+sha256=<HMAC(body, webhookSecret)>`, `X-WAV-Idempotency-Key: <id>`, `X-WAV-Attempt: <n>`.
+Retry backoff sampai 5×; status delivery di-persist (`PENDING/DELIVERED/FAILED/DISABLED`).
+DB = sumber kebenaran (polling tetap jalan walau webhook gagal).
+
+Capture via supervisor WS always-on (`src/lib/wa-verify-listener.ts`), divalidasi
+terhadap DB (hanya session ADMIN/SUPER_ADMIN aktif). Boot di `src/index.tsx`.
 
 ## Utility
 

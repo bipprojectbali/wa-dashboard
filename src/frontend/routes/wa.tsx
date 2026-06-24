@@ -30,6 +30,7 @@ import {
   TbMoon,
   TbPlugConnected,
   TbSend,
+  TbShieldCheck,
   TbShieldLock,
   TbSparkles,
   TbSun,
@@ -41,12 +42,13 @@ import { WaAccountPanel } from '@/frontend/components/wa/WaAccountPanel'
 import { WaConnectionPanel } from '@/frontend/components/wa/WaConnectionPanel'
 import { WaPolicyPanel } from '@/frontend/components/wa/WaPolicyPanel'
 import { WaSendPanel } from '@/frontend/components/wa/WaSendPanel'
+import { WaVerifyPanel } from '@/frontend/components/wa/WaVerifyPanel'
 import { useLogout, useSession } from '@/frontend/hooks/useAuth'
 import { useWaRealtime } from '@/frontend/hooks/useWaRealtime'
 import { authClient } from '@/lib/auth-client'
 import { rootRoute } from './__root'
 
-const validTabs = ['connection', 'account', 'send', 'policy'] as const
+const validTabs = ['connection', 'account', 'send', 'policy', 'verify'] as const
 type WaTab = (typeof validTabs)[number]
 
 export const waRoute = createRoute({
@@ -80,6 +82,7 @@ const navItems = [
   { key: 'account', label: 'Akun & Kontak', icon: TbAddressBook },
   { key: 'send', label: 'Kirim Pesan', icon: TbSend },
   { key: 'policy', label: 'Aturan & Kontrak', icon: TbShieldLock },
+  { key: 'verify', label: 'Verifikasi Nomor', icon: TbShieldCheck },
 ] as const
 
 type SideLink = {
@@ -326,6 +329,7 @@ function WaPage() {
         {active === 'account' && <WaAccountPanel />}
         {active === 'send' && <WaSendPanel />}
         {active === 'policy' && <WaPolicyPanel />}
+        {active === 'verify' && <WaVerifyPanel />}
       </AppShell.Main>
     </AppShell>
   )

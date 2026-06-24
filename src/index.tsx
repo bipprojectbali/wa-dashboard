@@ -186,6 +186,18 @@ async function cleanupAuditLogs() {
 cleanupAuditLogs().catch(console.error)
 setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
 
+// ─── WhatsApp Inbound Verify (WAV) ────────────────────
+import { startWaVerifySupervisor } from './lib/wa-verify-listener'
+import { sweepWaVerify } from './lib/wa-verify-sweep'
+
+// Listener WhatsApp always-on (capture token verifikasi masuk).
+startWaVerifySupervisor()
+
+// Expiry + webhook retry + cleanup inbound log. Jalan saat boot, lalu tiap menit
+// (retry webhook butuh kadens lebih rapat dari audit cleanup).
+sweepWaVerify().catch(console.error)
+setInterval(() => sweepWaVerify().catch(console.error), 60 * 1000)
+
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'
 
