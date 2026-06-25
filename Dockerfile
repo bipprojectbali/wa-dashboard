@@ -10,8 +10,12 @@ RUN bun install --frozen-lockfile
 FROM deps AS builder
 COPY . .
 
-# Generate Prisma client (pure TypeScript in v7 — no native binary or WASM)
-RUN bunx prisma generate
+# Generate Prisma client (pure TypeScript in v7 — no native binary or WASM).
+# prisma.config.ts resolves env('DATABASE_URL') eagerly on load; generate never
+# connects, so a throwaway placeholder satisfies the config without a real DB.
+# Scoped to this RUN only — never persists to later steps or the runtime image.
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+      bunx prisma generate
 
 # Frontend bundle (Vite → dist/)
 RUN bun run build
