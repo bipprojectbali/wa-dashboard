@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.1.3] - 2026-06-25
 
 ### Fixed
 - **Build produksi (Docker/staging)** — server binary tidak lagi crash saat startup dengan `TypeError: exports_external.function().returns is not a function`. Penyebab: `@elysiajs/swagger` meng-import `@scalar/themes` secara statis (hanya untuk string CSS `elysiajsTheme`), yang menyeret `@scalar/types` (ditulis untuk Zod v3) — saat di-bundle dengan Zod v4 project, `z.function().returns()` meledak. Crash hanya muncul di Docker (`--frozen-lockfile`, tanpa artifact Zod v3 nested). Server kini dikompilasi via `scripts/build-server.ts` yang men-stub `@scalar/themes`; UI docs Scalar tetap memuat aset dari CDN, backend tak berubah. Endpoint `/api/docs` + `/api/docs/json` terverifikasi tetap `200`.
