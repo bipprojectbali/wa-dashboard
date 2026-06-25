@@ -6,9 +6,8 @@
 #
 # retry menunggu inbound: interval 3s x 100 ~= 5 menit (= TTL token).
 #
-# Jalankan manual (request_id dari capture start.hurl):
-#   hurl --variable base_url=http://localhost:3111 \
-#        --variable api_key=wav_sk_xxx \
+# Jalankan manual — nilai dari .env + request_id dari capture start.hurl:
+#   hurl --variables-file hurl/wa-verify/.env \
 #        --variable request_id=<id> \
 #        hurl/wa-verify/poll.hurl
 GET {{base_url}}/api/verify/{{request_id}}

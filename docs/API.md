@@ -60,6 +60,7 @@ Guard: `guardAdmin(authUser)`. API key disuntik server-side di `src/lib/wa-clien
 | GET | `/api/wa/account` | Info akun (getClassInfo) |
 | GET | `/api/wa/contacts` | Daftar kontak |
 | GET | `/api/wa/chats` | Daftar chat |
+| GET | `/api/wa/messages` | Riwayat pesan satu chat (query `?chatId=<num>@c.us&limit=`) — `fetchMessages` on-demand, 1 req/buka. `chatId` wajib (`minLength:1`), `limit` max 100 (default 50). Upstream `{success:false}` → 502 |
 | GET | `/api/wa/avatar` | Foto profil kontak (query `?contactId=<num>@c.us`) — `{ url: string \| null }`, di-cache Redis 1 jam |
 | POST | `/api/wa/send` | Kirim pesan (body `{ chatId, content }`) — **digate enforcement anti-ban** |
 
@@ -136,14 +137,34 @@ kosong = **discovery** (nomor pengirim jadi nomor terverifikasi).
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
-| GET | `/api/wa/verify/consumers` | guardAdmin | List consumer (id, name, apiKeyPrefix, webhookUrl, active, `_count.requests`) + `canEdit` |
-| POST | `/api/wa/verify/consumers` | guardSuperAdmin | Buat consumer → `{ consumer, apiKey }`; **apiKey plaintext hanya muncul sekali**. Audit `WA_VERIFY_CONSUMER_CREATED` |
+| GET | `/api/wa/verify/consumers` | guardAdmin | List consumer ter-paginasi `{ consumers, total, canEdit }`. Query: `limit` (default 50, max 200), `offset`, `search` (filter `name`, `contains` case-insensitive), `active` (`true`/`false`) |
+| POST | `/api/wa/verify/consumers` | guardSuperAdmin | Buat consumer → `{ consumer: { ..., webhookSecret }, apiKey }`; **apiKey plaintext hanya muncul sekali**, `webhookSecret` bisa di-reveal ulang. Audit `WA_VERIFY_CONSUMER_CREATED` |
 | PUT | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Update name/webhookUrl/active (404 bila tak ada). Audit `WA_VERIFY_CONSUMER_UPDATED` |
 | POST | `/api/wa/verify/consumers/:id/regenerate-key` | guardSuperAdmin | Regen apiKey (balas sekali). Audit `WA_VERIFY_KEY_REGENERATED` |
+| GET | `/api/wa/verify/consumers/:id/reveal-secret` | guardSuperAdmin | Reveal `webhookSecret` plaintext (disimpan plaintext → boleh di-reveal ulang, beda dari apiKey yang di-hash). 404 bila tak ada. Audit `WA_VERIFY_SECRET_REVEALED` |
 | DELETE | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Hapus consumer (cascade requests). Audit `WA_VERIFY_CONSUMER_DELETED` |
-| GET | `/api/wa/verify/requests` | guardAdmin | List request terbaru (`?limit` max 200), `matchedPhone` **ter-mask** |
-| GET | `/api/wa/verify/inbound` | guardSuperAdmin | Raw inbound log (`?limit` max 200) |
+| POST | `/api/wa/verify/consumers/bulk-delete` | guardSuperAdmin | Body `{ ids?: string[] (max 500); all?: boolean }` → `{ count }`. `all` wipe semua; `ids` hapus subset (cascade requests). `ids` kosong tanpa `all` = no-op. Audit `WA_VERIFY_CONSUMER_DELETED` (`detail=bulk ...`) + `appLog('warn')` |
+| GET | `/api/wa/verify/requests` | guardAdmin | List request ter-paginasi `{ requests, total }`. Query: `limit`/`offset`, `search` (filter **nama consumer** — `matchedPhone` tak di-search, disimpan mentah & hanya keluar masked), `status` (`PENDING`/`VERIFIED`/`EXPIRED`), `delivery` (`PENDING`/`DELIVERED`/`FAILED`/`DISABLED`). `matchedPhone` **ter-mask** |
+| POST | `/api/wa/verify/requests/bulk-delete` | guardSuperAdmin | Body `{ ids?, all? }` → `{ count }`. Audit `WA_VERIFY_REQUESTS_DELETED` + `appLog('warn')` |
+| GET | `/api/wa/verify/inbound` | guardAdmin | Raw inbound log ter-paginasi `{ inbound, total }`. Query: `limit`/`offset`, `search` (filter `fromMasked` OR `tokenFound`, keduanya tersimpan masked/parsial), `matched` (`true`/`false`) |
+| POST | `/api/wa/verify/inbound/bulk-delete` | guardSuperAdmin | Body `{ ids?, all? }` → `{ count }`. Audit `WA_VERIFY_INBOUND_DELETED` + `appLog('warn')` |
+| GET | `/api/wa/verify/supervisor` | guardAdmin | State capture poller: `{ running, serverNumber (ter-mask), sessionId, watermark, lastPollAt, lastError, pollIntervalMs }` |
 | POST | `/api/wa/verify/requests/:id/replay` | guardSuperAdmin | Replay webhook (409 + `reason` bila gagal). Audit `WA_VERIFY_REPLAY` |
+
+### Simulasi Login (proxy SUPER_ADMIN, auth: session cookie)
+
+Menjalankan alur WAV end-to-end lewat browser untuk uji pra-rilis (route `/simulation`).
+**Proxy server-side**: endpoint cookie-auth menjalankan start/poll memakai consumer reserved
+`[simulation]` (lazy-create, idempoten via `getOrCreateSimConsumer`) — **API key tak pernah ke
+browser**, tapi pipeline yang dijalankan 100% asli. Request sim = `VerifyRequest` biasa →
+otomatis tertangkap poller & muncul di panel Requests (`/wa?tab=verify`). v1 hanya mode Login.
+Inti start/poll dibagi dengan public router via `src/lib/wa-verify-flow.ts` (no copy-paste).
+
+| Method | Path | Guard | Description |
+|--------|------|-------|-------------|
+| POST | `/api/wa/verify/sim/start` | guardSuperAdmin | Body `{ expectedPhone? (maxLength 32) }` → `{ id, token, sendTo, waMeUrl, expiresAt, instruction }`. `waMeUrl` = `https://wa.me/<digit>?text=<token>` (null bila `WA_VERIFY_SERVER_NUMBER` kosong). 503 bila gagal generate token. Audit `WA_VERIFY_SIM_START` + `appLog('info')` |
+| GET | `/api/wa/verify/sim/:id` | guardSuperAdmin | Poll `{ status, matchedPhone (ter-mask), verifiedAt, expiresAt }`, scoped consumer sim. 404 untuk id asing |
+| GET | `/api/wa/verify/sim/:id/qr` | guardSuperAdmin | QR PNG deep-link (`Content-Type: image/png`, `Cache-Control: no-store`). Token di-lookup via id (bukan teks query arbitrer). 404 bila id asing / `WA_VERIFY_SERVER_NUMBER` kosong |
 
 ### Webhook push ke consumer
 
@@ -154,8 +175,10 @@ sha256=<HMAC(body, webhookSecret)>`, `X-WAV-Idempotency-Key: <id>`, `X-WAV-Attem
 Retry backoff sampai 5×; status delivery di-persist (`PENDING/DELIVERED/FAILED/DISABLED`).
 DB = sumber kebenaran (polling tetap jalan walau webhook gagal).
 
-Capture via supervisor WS always-on (`src/lib/wa-verify-listener.ts`), divalidasi
-terhadap DB (hanya session ADMIN/SUPER_ADMIN aktif). Boot di `src/index.tsx`.
+Capture via supervisor REST-polling always-on (`src/lib/wa-verify-poller.ts`):
+`getChats` tiap 4s pada session container yang nomornya cocok `WA_VERIFY_SERVER_NUMBER`,
+filter pesan baru via watermark Redis `wa:verify:watermark:<sessionId>`. Menggantikan
+listener WS lama (WS upgrade 502 di edge Cloudflare). Boot di `src/index.tsx`.
 
 ## Utility
 

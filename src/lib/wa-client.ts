@@ -105,3 +105,9 @@ export const sendMessage = (id: string, chatId: string, content: string) =>
     method: 'POST',
     body: JSON.stringify({ chatId, contentType: 'string', content }),
   })
+
+export const fetchChatMessages = (id: string, chatId: string, limit: number) =>
+  waFetch<{ success: boolean; messages?: unknown[]; result?: unknown[] }>(`/client/fetchMessages/${id}`, {
+    method: 'POST',
+    body: JSON.stringify({ chatId, searchOptions: { limit } }),
+  })

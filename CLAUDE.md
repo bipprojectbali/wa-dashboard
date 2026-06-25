@@ -173,6 +173,6 @@ See @docs/API.md
 See @docs/FRONTEND.md
 See @docs/DATABASE.md
 See @docs/MCP.md
-See @docs/FILE-HEALTH.md
-See @docs/FEATURE-CHECKLIST.md
-See @docs/SPLIT-CLAUDE.md
+See `docs/FILE-HEALTH.md` (baca on-demand)
+See `docs/FEATURE-CHECKLIST.md` (baca on-demand)
+See `docs/SPLIT-CLAUDE.md` (baca on-demand)

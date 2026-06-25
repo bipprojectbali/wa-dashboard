@@ -4,9 +4,12 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   Code,
-  CopyButton,
   Group,
+  Loader,
+  Pagination,
+  SegmentedControl,
   Stack,
   Switch,
   Table,
@@ -15,57 +18,60 @@ import {
   Title,
   Tooltip,
 } from '@mantine/core'
+import { useDebouncedValue } from '@mantine/hooks'
 import { modals } from '@mantine/modals'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { TbCopy, TbCopyCheck, TbKey, TbPencil, TbPlus, TbTrash } from 'react-icons/tb'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
+import { TbEye, TbKey, TbPencil, TbPlus, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/apiFetch'
+import { useRowSelection } from '@/frontend/lib/wa-verify-selection'
 import { openEditConsumerModal } from './WaVerifyConsumerEditModal'
-import type { CreatedConsumer, VerifyConsumer } from './wa-verify.types'
+import { showApiKeyModal, showCreatedModal, showSecretModal } from './WaVerifyConsumerModals'
+import { WaVerifyToolbar } from './WaVerifyToolbar'
+import {
+  type ConsumersResponse,
+  type CreatedConsumer,
+  PAGE_SIZE,
+  type RevealedSecret,
+  type VerifyConsumer,
+} from './wa-verify.types'
 
-interface Props {
-  consumers: VerifyConsumer[]
-  canEdit: boolean
-}
+const QKEY = ['wa', 'verify', 'consumers']
 
-// Modal yang menampilkan API key plaintext SEKALI — setelah ditutup tak bisa dilihat lagi.
-function showApiKeyModal(apiKey: string, title: string) {
-  modals.open({
-    title,
-    children: (
-      <Stack gap="sm">
-        <Alert color="orange" variant="light">
-          Simpan key ini sekarang. Key plaintext hanya ditampilkan sekali dan tidak disimpan di server.
-        </Alert>
-        <Group gap="xs">
-          <Code fz="sm" style={{ wordBreak: 'break-all', flex: 1 }}>
-            {apiKey}
-          </Code>
-          <CopyButton value={apiKey}>
-            {({ copied, copy }) => (
-              <Button
-                size="xs"
-                variant="light"
-                color={copied ? 'teal' : 'blue'}
-                leftSection={copied ? <TbCopyCheck size={14} /> : <TbCopy size={14} />}
-                onClick={copy}
-              >
-                {copied ? 'Tersalin' : 'Salin'}
-              </Button>
-            )}
-          </CopyButton>
-        </Group>
-      </Stack>
-    ),
-  })
-}
-
-export function WaVerifyConsumers({ consumers, canEdit }: Props) {
+export function WaVerifyConsumers() {
   const qc = useQueryClient()
   const [name, setName] = useState('')
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [search, setSearch] = useState('')
+  const [debouncedSearch] = useDebouncedValue(search, 300)
+  const [activeFilter, setActiveFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const selection = useRowSelection()
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['wa', 'verify', 'consumers'] })
+  // biome-ignore lint/correctness/useExhaustiveDependencies: filter changes reset pagination, values not read in body
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, activeFilter])
+
+  const query = useQuery({
+    queryKey: [...QKEY, { search: debouncedSearch, activeFilter, page }],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String((page - 1) * PAGE_SIZE) })
+      if (debouncedSearch) params.set('search', debouncedSearch)
+      if (activeFilter !== 'all') params.set('active', activeFilter)
+      return apiFetch<ConsumersResponse>(`/api/wa/verify/consumers?${params}`)
+    },
+    placeholderData: (prev) => prev,
+    staleTime: 10_000,
+  })
+
+  const consumers = query.data?.consumers ?? []
+  const total = query.data?.total ?? 0
+  const canEdit = query.data?.canEdit ?? false
+  const pageIds = consumers.map((c) => c.id)
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: QKEY })
 
   const create = useMutation({
     mutationFn: () =>
@@ -77,7 +83,7 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
       setName('')
       setWebhookUrl('')
       invalidate()
-      showApiKeyModal(data.apiKey, `API key untuk ${data.consumer.name}`)
+      showCreatedModal(data)
     },
   })
 
@@ -90,6 +96,12 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
     },
   })
 
+  const reveal = useMutation({
+    mutationFn: (c: VerifyConsumer) =>
+      apiFetch<RevealedSecret>(`/api/wa/verify/consumers/${c.id}/reveal-secret`).then((d) => ({ name: c.name, ...d })),
+    onSuccess: (data) => showSecretModal(data.name, data.webhookSecret),
+  })
+
   const toggle = useMutation({
     mutationFn: (c: VerifyConsumer) =>
       apiFetch(`/api/wa/verify/consumers/${c.id}`, {
@@ -99,9 +111,16 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
     onSuccess: invalidate,
   })
 
-  const remove = useMutation({
-    mutationFn: (id: string) => apiFetch(`/api/wa/verify/consumers/${id}`, { method: 'DELETE' }),
-    onSuccess: invalidate,
+  const bulkDelete = useMutation({
+    mutationFn: (payload: { ids?: string[]; all?: boolean }) =>
+      apiFetch<{ count: number }>('/api/wa/verify/consumers/bulk-delete', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      selection.clear()
+      invalidate()
+    },
   })
 
   const confirmRegen = (c: VerifyConsumer) =>
@@ -118,18 +137,32 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
       onConfirm: () => regen.mutate(c.id),
     })
 
-  const confirmDelete = (c: VerifyConsumer) =>
+  const confirmDeleteSelected = () =>
     modals.openConfirmModal({
-      title: 'Hapus consumer',
+      title: 'Hapus consumer terpilih',
       children: (
         <Text size="sm">
-          Hapus consumer <b>{c.name}</b>? Semua request verifikasinya ikut terhapus (cascade). Tindakan ini tak bisa
-          dibatalkan.
+          Hapus <b>{selection.count}</b> consumer terpilih? Semua request verifikasinya ikut terhapus (cascade).
+          Tindakan ini tak bisa dibatalkan.
         </Text>
       ),
       labels: { confirm: 'Hapus', cancel: 'Batal' },
       confirmProps: { color: 'red' },
-      onConfirm: () => remove.mutate(c.id),
+      onConfirm: () => bulkDelete.mutate({ ids: [...selection.selected] }),
+    })
+
+  const confirmDeleteAll = () =>
+    modals.openConfirmModal({
+      title: 'Hapus SEMUA consumer',
+      children: (
+        <Text size="sm">
+          Hapus <b>seluruh {total}</b> consumer beserta semua request verifikasinya (cascade)? Semua app yang memakai
+          WAV akan kehilangan akses. Tindakan ini tak bisa dibatalkan.
+        </Text>
+      ),
+      labels: { confirm: 'Hapus semua', cancel: 'Batal' },
+      confirmProps: { color: 'red' },
+      onConfirm: () => bulkDelete.mutate({ all: true }),
     })
 
   return (
@@ -169,16 +202,61 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
             {(create.error as Error).message}
           </Alert>
         )}
+        {bulkDelete.isError && (
+          <Alert color="red" variant="light">
+            {(bulkDelete.error as Error).message}
+          </Alert>
+        )}
 
-        {consumers.length === 0 ? (
+        <WaVerifyToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Cari nama consumer…"
+          filters={
+            <SegmentedControl
+              size="xs"
+              value={activeFilter}
+              onChange={setActiveFilter}
+              data={[
+                { label: 'Semua', value: 'all' },
+                { label: 'Aktif', value: 'true' },
+                { label: 'Nonaktif', value: 'false' },
+              ]}
+            />
+          }
+          selectedCount={selection.count}
+          total={total}
+          canEdit={canEdit}
+          onDeleteSelected={confirmDeleteSelected}
+          onDeleteAll={confirmDeleteAll}
+          onRefresh={() => query.refetch()}
+          refreshing={query.isFetching}
+          deleting={bulkDelete.isPending}
+        />
+
+        {query.isLoading ? (
+          <Loader />
+        ) : consumers.length === 0 ? (
           <Text size="sm" c="dimmed">
-            Belum ada consumer terdaftar.
+            {debouncedSearch || activeFilter !== 'all'
+              ? 'Tak ada consumer yang cocok.'
+              : 'Belum ada consumer terdaftar.'}
           </Text>
         ) : (
-          <Table.ScrollContainer minWidth={620}>
+          <Table.ScrollContainer minWidth={660}>
             <Table verticalSpacing="xs" highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
+                  {canEdit && (
+                    <Table.Th w={36}>
+                      <Checkbox
+                        size="xs"
+                        checked={selection.allOnPageSelected(pageIds)}
+                        indeterminate={selection.someOnPageSelected(pageIds) && !selection.allOnPageSelected(pageIds)}
+                        onChange={() => selection.togglePage(pageIds)}
+                      />
+                    </Table.Th>
+                  )}
                   <Table.Th>Nama</Table.Th>
                   <Table.Th>Key Prefix</Table.Th>
                   <Table.Th>Webhook</Table.Th>
@@ -189,7 +267,16 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
               </Table.Thead>
               <Table.Tbody>
                 {consumers.map((c) => (
-                  <Table.Tr key={c.id}>
+                  <Table.Tr key={c.id} bg={selection.isSelected(c.id) ? 'var(--mantine-color-blue-light)' : undefined}>
+                    {canEdit && (
+                      <Table.Td>
+                        <Checkbox
+                          size="xs"
+                          checked={selection.isSelected(c.id)}
+                          onChange={() => selection.toggleRow(c.id)}
+                        />
+                      </Table.Td>
+                    )}
                     <Table.Td>{c.name}</Table.Td>
                     <Table.Td>
                       <Code fz="xs">{c.apiKeyPrefix}…</Code>
@@ -217,6 +304,16 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
                     {canEdit && (
                       <Table.Td>
                         <Group gap={4} wrap="nowrap">
+                          <Tooltip label="Lihat webhook secret">
+                            <ActionIcon
+                              variant="subtle"
+                              color="teal"
+                              onClick={() => reveal.mutate(c)}
+                              loading={reveal.isPending && reveal.variables?.id === c.id}
+                            >
+                              <TbEye size={16} />
+                            </ActionIcon>
+                          </Tooltip>
                           <Tooltip label="Edit nama / webhook">
                             <ActionIcon variant="subtle" color="blue" onClick={() => openEditConsumerModal(c)}>
                               <TbPencil size={16} />
@@ -233,7 +330,7 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
                             </ActionIcon>
                           </Tooltip>
                           <Tooltip label="Hapus">
-                            <ActionIcon variant="subtle" color="red" onClick={() => confirmDelete(c)}>
+                            <ActionIcon variant="subtle" color="red" onClick={() => bulkDelete.mutate({ ids: [c.id] })}>
                               <TbTrash size={16} />
                             </ActionIcon>
                           </Tooltip>
@@ -245,6 +342,15 @@ export function WaVerifyConsumers({ consumers, canEdit }: Props) {
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>
+        )}
+
+        {total > PAGE_SIZE && (
+          <Group justify="space-between">
+            <Text size="xs" c="dimmed">
+              {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} dari {total}
+            </Text>
+            <Pagination value={page} onChange={setPage} total={totalPages} size="sm" />
+          </Group>
         )}
       </Stack>
     </Card>

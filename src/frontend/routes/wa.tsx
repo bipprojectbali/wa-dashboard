@@ -27,6 +27,7 @@ import {
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
   TbLogout,
+  TbMessages,
   TbMoon,
   TbPlugConnected,
   TbSend,
@@ -40,6 +41,7 @@ import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { openWhatsNew } from '@/frontend/components/WhatsNewModal'
 import { WaAccountPanel } from '@/frontend/components/wa/WaAccountPanel'
 import { WaConnectionPanel } from '@/frontend/components/wa/WaConnectionPanel'
+import { WaMessagesPanel } from '@/frontend/components/wa/WaMessagesPanel'
 import { WaPolicyPanel } from '@/frontend/components/wa/WaPolicyPanel'
 import { WaSendPanel } from '@/frontend/components/wa/WaSendPanel'
 import { WaVerifyPanel } from '@/frontend/components/wa/WaVerifyPanel'
@@ -48,7 +50,7 @@ import { useWaRealtime } from '@/frontend/hooks/useWaRealtime'
 import { authClient } from '@/lib/auth-client'
 import { rootRoute } from './__root'
 
-const validTabs = ['connection', 'account', 'send', 'policy', 'verify'] as const
+const validTabs = ['connection', 'account', 'send', 'messages', 'policy', 'verify'] as const
 type WaTab = (typeof validTabs)[number]
 
 export const waRoute = createRoute({
@@ -81,6 +83,7 @@ const navItems = [
   { key: 'connection', label: 'Koneksi', icon: TbPlugConnected },
   { key: 'account', label: 'Akun & Kontak', icon: TbAddressBook },
   { key: 'send', label: 'Kirim Pesan', icon: TbSend },
+  { key: 'messages', label: 'Pesan', icon: TbMessages },
   { key: 'policy', label: 'Aturan & Kontrak', icon: TbShieldLock },
   { key: 'verify', label: 'Verifikasi Nomor', icon: TbShieldCheck },
 ] as const
@@ -328,6 +331,7 @@ function WaPage() {
         {active === 'connection' && <WaConnectionPanel wsReady={wsReady} />}
         {active === 'account' && <WaAccountPanel />}
         {active === 'send' && <WaSendPanel />}
+        {active === 'messages' && <WaMessagesPanel />}
         {active === 'policy' && <WaPolicyPanel />}
         {active === 'verify' && <WaVerifyPanel />}
       </AppShell.Main>

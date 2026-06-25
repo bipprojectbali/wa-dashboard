@@ -22,7 +22,8 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 | `profile.tsx` | `profileRoute` | `/profile` | authenticated |
 | `blocked.tsx` | `blockedRoute` | `/blocked` | authenticated |
 | `changelog.tsx` | `changelogRoute` | `/changelog` | authenticated — full version history from `GET /api/changelog?all=true` |
-| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|policy\|verify) |
+| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|messages\|policy\|verify) |
+| `simulation.tsx` | `simulationRoute` | `/simulation` | SUPER_ADMIN, `validateSearch` for `?tab=` (login). AppShell+sidebar sendiri (clone pola dev.tsx, localStorage `simulation:sidebar`), cross-link balik ke `/dev` |
 
 **Rule:** new route → (1) create file, (2) export `*Route` via `createRoute`, (3) add to `router.ts` `addChildren([...])`.
 
@@ -45,8 +46,17 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 ### WA panels (`src/frontend/components/wa/`)
 
 Tab `?tab=connection` ("Koneksi"):
-- `WaConnectionPanel.tsx` — status koneksi + tombol Start/Restart/Terminate. Query `['wa','status']` GET `/api/wa/session/status`; selama state belum `CONNECTED` selalu polling 3s (transisi pairing bisa terjadi tanpa event WS final), setelah `CONNECTED` mengandalkan WS bila `wsReady` (fallback polling bila WS mati). Kartu pairing punya `SegmentedControl` QR ↔ Nomor HP: mode QR menampilkan `GET /api/wa/session/qr/image`; mode Nomor HP kirim `POST /api/wa/session/pairing-code` lalu menampilkan kode pairing dengan tombol salin.
+- `WaConnectionPanel.tsx` — status koneksi + tombol Start/Restart/Terminate. Query `['wa','status']` GET `/api/wa/session/status`; selama state belum `CONNECTED` selalu polling 3s (transisi pairing bisa terjadi tanpa event WS final), setelah `CONNECTED` mengandalkan WS bila `wsReady` (fallback polling bila WS mati). Saat `CONNECTED` menampilkan kartu "Sesi Aktif" (`<WaAccountSummary>`) berisi nama/nomor/platform akun yang tertaut; saat belum `CONNECTED` kartu QR/pairing dengan `SegmentedControl` QR ↔ Nomor HP: mode QR menampilkan `GET /api/wa/session/qr/image`; mode Nomor HP kirim `POST /api/wa/session/pairing-code` lalu menampilkan kode pairing dengan tombol salin. (Kartu Sesi Aktif & kartu QR saling eksklusif via `connected`/`needsQr`.)
+- `WaAccountSummary.tsx` — komponen bersama (dipakai tab Koneksi + tab Info Akun) yang menampilkan kartu ringkasan akun: query `['wa','account']` GET `/api/wa/account`, render Nama/Nomor/Platform. Prop `enabled?: boolean` (default `true`) menunda fetch sampai relevan. Query key sama dengan `WaAccountPanel` → TanStack Query dedup, tidak ada fetch ganda. Tipe `AccountResp` di sini (sumber tunggal).
 - `src/frontend/lib/wa-pairing.ts` — helper murni (tanpa React) untuk flow pairing: `extractPairingCode` (baca varian bentuk respons container) dan `pairingCodeOrThrow` (lempar Error actionable saat container balas `HTTP 200 { success: false }`, mis. `session_not_found` — kalau tidak, kegagalan tertelan diam karena `apiFetch` hanya throw pada non-2xx). Dipakai sebagai `mutationFn` pairing agar error muncul di `pairing.error`/alert.
+
+Tab `?tab=messages` ("Pesan", icon `TbMessages`):
+- `WaMessagesPanel.tsx` — orchestrator. Query `['wa','chats']` GET `/api/wa/chats`, `['wa','verify','inbound']` GET `/api/wa/verify/inbound?limit=200`, `['wa','verify','supervisor']` GET `/api/wa/verify/supervisor`. Gabung chat+inbound via `mergeMessages`, filter klien-side via `filterMessages` (state `search` + dua `TextInput type="date"` dateFrom/dateTo). Badge `{filtered}/{total}`. Drill-down: state `activeChatId` → buka `WaChatHistoryModal`.
+- `WaMessagesPollingInfo.tsx` — kartu state capture poller (prop `state: SupervisorState | undefined`): badge `running` → 'aktif'/'idle', sessionId, nomor server ter-mask, lastPollAt, lastError, pollIntervalMs. "informasi polling jika ada" — idle/null tampil status, bukan error.
+- `WaMessagesList.tsx` — tabel terpadu (kolom Waktu, Sumber [badge Chat/WAV], Dari, Pesan). Baris `source:'chat'` dengan `chatId` klik → `onOpenChat`; baris WAV read-only.
+- `WaChatHistoryModal.tsx` — Mantine modal riwayat satu chat. Query `['wa','messages',chatId]` GET `/api/wa/messages?chatId=` (enabled saat `chatId` ada), `messages = data?.messages ?? data?.result ?? []`. Loading + error (502) ditangani eksplisit.
+- `wa-messages.types.ts` — tipe `ChatRow`, `ChatsResponse`, `ChatMessage`, `ChatMessagesResponse`, `SupervisorState`, `UnifiedMessage` (sumber tunggal, re-export `InboundLogRow`).
+- `src/frontend/lib/wa-messages.ts` — helper murni (unit-testable, tanpa React): `mergeMessages(chats, inbound)` (normalisasi + urut desc, chat tanpa `lastMessage`/`t` di-skip; `lastMessage.t` epoch detik → ms) & `filterMessages(rows, { search, dateFrom, dateTo })` (search case-insensitive from+text, rentang tanggal inklusif).
 
 Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 - `WaPolicyPanel.tsx` — orchestrator, query `['wa','policy']` GET `/api/wa/policy`. Banner oranye saat `allowFirstContact=true` (mode OTP aktif).
@@ -56,16 +66,19 @@ Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 - `wa-policy.types.ts` — tipe `WaPolicy`, `UsageSnapshot`, `PolicyResponse`, `PolicyEditable`.
 
 Tab `?tab=account` ("Info Akun"):
-- `WaAccountPanel.tsx` — info akun + tabel kontak dengan search box (nama/nomor) dan kolom "Foto".
+- `WaAccountPanel.tsx` — kartu info akun (via `<WaAccountSummary>`) + tabel kontak dengan search box (nama/nomor) dan kolom "Foto". Query kontak `['wa','contacts']` tetap eksklusif di sini.
 - `WaContactAvatar.tsx` — avatar lazy per kontak. `IntersectionObserver` (`rootMargin: '100px'`) menunda fetch sampai baris masuk viewport, lalu query `['wa','avatar',contactId]` GET `/api/wa/avatar`. Mantine `<Avatar>` fallback ke inisial nama bila `url` null.
 
 Tab `?tab=verify` ("Verifikasi Nomor", icon `TbShieldCheck`, ADMIN+SUPER_ADMIN):
-- `WaVerifyPanel.tsx` — orchestrator, query `['wa','verify','consumers']` GET `/api/wa/verify/consumers`. Render `WaVerifyGuide` + `WaVerifyConsumers` + `WaVerifyLogs`; `WaVerifyInbound` hanya untuk SUPER_ADMIN (gate `isSuperAdmin`).
+- `WaVerifyPanel.tsx` — orchestrator. Hanya baca `isSuperAdmin` dari `useSession` (tak lagi fetch consumers — tiap panel self-fetch). Render `WaVerifyGuide` + `WaVerifyConsumers` + `WaVerifyLogs` (`canEdit={isSuperAdmin}`); `WaVerifyInbound` hanya untuk SUPER_ADMIN (gate `isSuperAdmin`).
 - `WaVerifyGuide.tsx` — kartu panduan statis (tanpa data fetch): menjelaskan cara kerja WAV sebagai langkah berurutan (daftar consumer → start → user kirim token → server cocokkan → app terima hasil via polling/webhook) + penjelasan mode Login vs Discovery. Ringkasan dari `docs/WA-VERIFY.md`.
-- `WaVerifyConsumers.tsx` — list consumer + CRUD (create/edit/regenerate-key/toggle active/delete). Ikon **edit** (`TbPencil`) per row buka `openEditConsumerModal` (`WaVerifyConsumerEditModal.tsx`) untuk ubah name/webhookUrl via PUT `/api/wa/verify/consumers/:id`. **Regenerate = ambil ulang full key**: karena server hanya simpan hash (recopy plaintext mustahil), tombol `TbKey` pakai confirm modal lalu POST `.../regenerate-key` → key baru tampil sekali (key lama langsung batal). Modal apiKey **once-only** (`showApiKeyModal`): plaintext key hanya muncul sekali saat create/regen, dengan tombol salin + warning.
-- `WaVerifyLogs.tsx` — request terbaru (`['wa','verify','requests']`), badge `STATUS_COLOR` (status verifikasi) + `DELIVERY_COLOR` (status webhook), tombol replay (`canReplay`, SUPER_ADMIN) → POST `.../replay`. Nomor sudah ter-mask dari server.
-- `WaVerifyInbound.tsx` — raw inbound log (`['wa','verify','inbound']`, SUPER_ADMIN saja). Nomor ter-mask, token terdeteksi, kolom cocok ya/tidak.
-- `wa-verify.types.ts` — tipe `Consumer`, `ConsumersResponse`, `VerifyRequest`, `RequestsResponse`, `InboundResponse`.
+- `WaVerifyConsumers.tsx` — **self-fetch** (query `['wa','verify','consumers', { search, activeFilter, page }]` GET `/api/wa/verify/consumers` dengan `limit=PAGE_SIZE&offset&search&active`) + CRUD + toolbar/pagination/bulk-select. `<WaVerifyToolbar>`: search nama (debounce 300ms) + `SegmentedControl` aktif (Semua/Aktif/Nonaktif) di slot `filters`. Kolom checkbox (header `togglePage`, baris `toggleRow` via `useRowSelection`). `<Pagination>` saat `total > PAGE_SIZE`. Bulk-delete (POST `/api/wa/verify/consumers/bulk-delete`): "Hapus terpilih (N)" kirim `{ ids }`, "Hapus semua" kirim `{ all: true }`, keduanya `modals.openConfirmModal` merah; delete single = `bulkDelete.mutate({ ids: [c.id] })`. CRUD: ikon **edit** (`TbPencil`) buka `openEditConsumerModal` (`WaVerifyConsumerEditModal.tsx`) PUT `/api/wa/verify/consumers/:id`. **Regenerate = ambil ulang full key** (server simpan hash, recopy mustahil): tombol `TbKey` confirm → POST `.../regenerate-key` → key baru sekali. Modal apiKey **once-only** + reveal webhook secret (`TbEye` → GET `.../reveal-secret`) + modal gabungan saat create. Modal & `SecretField` diekstrak ke `WaVerifyConsumerModals.tsx` (`showApiKeyModal`/`showCreatedModal`/`showSecretModal`).
+- `WaVerifyLogs.tsx` — props `{ canEdit }`. Self-fetch `['wa','verify','requests', { search, status, delivery, page }]` (`refetchInterval` 30s). `<WaVerifyToolbar>`: search nama consumer + dua `Select` (status PENDING/VERIFIED/EXPIRED, delivery PENDING/DELIVERED/FAILED/DISABLED). Kolom checkbox + Aksi (replay) gated `canEdit`. Badge `STATUS_COLOR` + `DELIVERY_COLOR`, replay (`canReplay`) → POST `.../replay`. Bulk-delete POST `/api/wa/verify/requests/bulk-delete` (`{ ids }`/`{ all }`). `<Pagination>`. Nomor ter-mask dari server.
+- `WaVerifyInbound.tsx` — raw inbound log (SUPER_ADMIN saja, no props → toolbar selalu `canEdit`). Self-fetch `['wa','verify','inbound', { search, matched, page }]`. `<WaVerifyToolbar>`: search dari/token + `SegmentedControl` cocok (Semua/Cocok/Tidak). Kolom checkbox + Pagination. Bulk-delete POST `/api/wa/verify/inbound/bulk-delete`. Nomor ter-mask, token terdeteksi, kolom cocok ya/tidak.
+- `WaVerifyToolbar.tsx` — toolbar generik dipakai ketiga panel: `TextInput` search (`TbSearch`), slot `filters?: ReactNode`, tombol "Hapus terpilih (N)" (saat `canEdit && selectedCount>0`) + "Hapus semua" (`canEdit`, disabled saat `total===0`), `ActionIcon` refresh. Props: search/onSearchChange/searchPlaceholder/filters/selectedCount/total/canEdit/onDeleteSelected/onDeleteAll/onRefresh/refreshing/deleting.
+- `WaVerifyConsumerModals.tsx` — `SecretField` + `showApiKeyModal`/`showCreatedModal`/`showSecretModal` (diekstrak dari `WaVerifyConsumers` agar tetap di bawah batas ukuran).
+- `src/frontend/lib/wa-verify-selection.ts` — hook `useRowSelection()` (Set id): `selected`, `count`, `isSelected`, `toggleRow`, `togglePage(pageIds)`, `clear`, `allOnPageSelected`/`someOnPageSelected`. Dipakai ketiga panel untuk checkbox bulk-select (tanpa duplikasi logika).
+- `wa-verify.types.ts` — tipe `Consumer`, `ConsumersResponse`, `VerifyRequest`, `RequestsResponse`, `InboundResponse` (ketiganya kini punya `total`), const `PAGE_SIZE`.
 
 ## Data Fetching
 
@@ -101,7 +114,29 @@ manual per sesi. Query `['admin','wa-sessions']` GET `/api/admin/wa-sessions` (r
 Tabel: Session ID (truncate + tooltip, monospace), Status (badge hijau bila connected),
 Nomor (sudah ter-mask dari server), Nama, Mapped (badge oranye `orphan` atau email user),
 Aksi Terminate (`modals.openConfirmModal` merah → POST `/api/admin/wa-sessions/:id/terminate`).
-Badge ringkasan total/connected/orphan. Component: `src/frontend/components/dev/WaSessionsPanel.tsx`.
+Badge ringkasan total/connected/orphan. Baris milik operator yang sedang login (sessionId =
+`useSession().data.user.id`) ditandai highlight biru + badge "Sesi Anda". Component:
+`src/frontend/components/dev/WaSessionsPanel.tsx`.
+
+Sidebar `/dev` punya NavLink "Simulation" (icon `TbLogin2`, grup "Apps") → `navigate({ to:
+'/simulation', search: { tab: 'login' } })`.
+
+### Halaman Simulasi Login (`/simulation`, `src/frontend/components/sim/`)
+
+Route standalone SUPER_ADMIN untuk menguji alur WAV end-to-end lewat browser sebelum rilis.
+Proxy server-side (API key tak ke browser); datanya juga muncul di panel Requests `/wa?tab=verify`.
+
+- `SimLoginPanel.tsx` — orchestrator. Kartu "halaman login palsu" (input nomor = `expectedPhone`,
+  tombol "Login via WhatsApp"). `useMutation` POST `/api/wa/verify/sim/start`; tampilkan QR
+  (`<Image src="/api/wa/verify/sim/:id/qr">`) + tombol "Buka di WhatsApp" (`waMeUrl`) + salin token.
+  `useQuery` poll `/api/wa/verify/sim/:id` `refetchInterval` 3s selama `PENDING`, `false` saat
+  terminal. Banner VERIFIED (matchedPhone ter-mask) / EXPIRED. Alert jujur: deep-link hanya
+  pre-fill, operator tetap tap kirim. Render `<SimEventLog>`.
+- `SimEventLog.tsx` — timeline berstempel waktu tiap langkah + raw JSON per langkah + durasi total
+  (log untuk developer).
+- `sim.types.ts` — `SimStartResp`, `SimStatusResp`, `SimLogEntry` (sumber tunggal).
+- `src/frontend/lib/sim-log.ts` — builder murni `appendLog(entries, label, data?)` + `fmtDuration(ms)`
+  (unit-testable, tanpa React).
 
 ## Dev Tools
 

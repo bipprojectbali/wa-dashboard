@@ -3,6 +3,7 @@ import { modals } from '@mantine/modals'
 import { notifications } from '@mantine/notifications'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { TbTrash } from 'react-icons/tb'
+import { useSession } from '@/frontend/hooks/useAuth'
 import { apiFetch } from '@/frontend/lib/apiFetch'
 
 interface WaSessionInfo {
@@ -25,6 +26,8 @@ const WA_SESSIONS_KEY = ['admin', 'wa-sessions']
 
 export function WaSessionsPanel() {
   const qc = useQueryClient()
+  const session = useSession()
+  const currentUserId = session.data?.user.id
   const { data, isLoading } = useQuery({
     queryKey: WA_SESSIONS_KEY,
     queryFn: () => apiFetch<WaSessionsResponse>('/api/admin/wa-sessions'),
@@ -111,40 +114,50 @@ export function WaSessionsPanel() {
                     </Table.Td>
                   </Table.Tr>
                 )}
-                {sessions.map((s) => (
-                  <Table.Tr key={s.sessionId}>
-                    <Table.Td>
-                      <Tooltip label={s.sessionId} withArrow>
-                        <Text size="sm" maw={160} truncate ff="monospace">
-                          {s.sessionId}
-                        </Text>
-                      </Tooltip>
-                    </Table.Td>
-                    <Table.Td>
-                      <Badge color={s.connected ? 'green' : 'gray'} variant="light">
-                        {s.state ?? 'unknown'}
-                      </Badge>
-                    </Table.Td>
-                    <Table.Td>{s.phone ?? <Text c="dimmed">—</Text>}</Table.Td>
-                    <Table.Td>{s.name ?? <Text c="dimmed">—</Text>}</Table.Td>
-                    <Table.Td>
-                      {s.orphan ? (
-                        <Badge color="orange" variant="light">
-                          orphan
+                {sessions.map((s) => {
+                  const isMine = s.sessionId === currentUserId
+                  return (
+                    <Table.Tr key={s.sessionId} bg={isMine ? 'var(--mantine-color-blue-light)' : undefined}>
+                      <Table.Td>
+                        <Group gap="xs" wrap="nowrap">
+                          <Tooltip label={s.sessionId} withArrow>
+                            <Text size="sm" maw={160} truncate ff="monospace">
+                              {s.sessionId}
+                            </Text>
+                          </Tooltip>
+                          {isMine && (
+                            <Badge color="blue" variant="filled" size="xs">
+                              Sesi Anda
+                            </Badge>
+                          )}
+                        </Group>
+                      </Table.Td>
+                      <Table.Td>
+                        <Badge color={s.connected ? 'green' : 'gray'} variant="light">
+                          {s.state ?? 'unknown'}
                         </Badge>
-                      ) : (
-                        <Text size="sm">{s.mappedUserEmail}</Text>
-                      )}
-                    </Table.Td>
-                    <Table.Td ta="right">
-                      <Tooltip label="Terminate" withArrow>
-                        <ActionIcon color="red" variant="subtle" onClick={() => confirmTerminate(s)}>
-                          <TbTrash size={16} />
-                        </ActionIcon>
-                      </Tooltip>
-                    </Table.Td>
-                  </Table.Tr>
-                ))}
+                      </Table.Td>
+                      <Table.Td>{s.phone ?? <Text c="dimmed">—</Text>}</Table.Td>
+                      <Table.Td>{s.name ?? <Text c="dimmed">—</Text>}</Table.Td>
+                      <Table.Td>
+                        {s.orphan ? (
+                          <Badge color="orange" variant="light">
+                            orphan
+                          </Badge>
+                        ) : (
+                          <Text size="sm">{s.mappedUserEmail}</Text>
+                        )}
+                      </Table.Td>
+                      <Table.Td ta="right">
+                        <Tooltip label="Terminate" withArrow>
+                          <ActionIcon color="red" variant="subtle" onClick={() => confirmTerminate(s)}>
+                            <TbTrash size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                      </Table.Td>
+                    </Table.Tr>
+                  )
+                })}
               </Table.Tbody>
             </Table>
           </Table.ScrollContainer>

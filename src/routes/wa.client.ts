@@ -75,6 +75,25 @@ export const waClientRouter = new Elysia({ tags: ['WA'] })
     },
   )
 
+  .get(
+    '/api/wa/messages',
+    async ({ authUser, query }) => {
+      const guard = guardAdmin(authUser)
+      if (guard) return guard
+      const limit = Math.min(Number(query.limit) || 50, 100)
+      const res = await wa.fetchChatMessages(authUser!.id, query.chatId, limit)
+      // waFetch hanya throw saat !res.ok; container bisa balas HTTP 200
+      // { success:false } untuk error level-app (mis. chat tak ada) — perlakukan
+      // sebagai kegagalan upstream, jangan kembalikan data kosong diam-diam.
+      if (!res.success) throw new wa.WaUpstreamError(`fetchMessages failed for chat ${query.chatId}`)
+      return res
+    },
+    {
+      detail: { summary: 'Fetch one chat message history', security: [{ cookieAuth: [] }] },
+      query: t.Object({ chatId: t.String({ minLength: 1 }), limit: t.Optional(t.String()) }),
+    },
+  )
+
   .post(
     '/api/wa/send',
     async ({ authUser, body, set, request }) => {

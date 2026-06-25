@@ -1,14 +1,10 @@
-import { Alert, Card, Group, Loader, ScrollArea, Stack, Table, Text, TextInput, Title } from '@mantine/core'
+import { Group, Loader, ScrollArea, Stack, Table, TextInput, Title } from '@mantine/core'
 import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { TbSearch } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/apiFetch'
+import { WaAccountSummary } from './WaAccountSummary'
 import { WaContactAvatar } from './WaContactAvatar'
-
-interface AccountResp {
-  success: boolean
-  sessionInfo?: { pushname?: string; wid?: { user?: string }; platform?: string }
-}
 
 interface Contact {
   id?: { user?: string; _serialized?: string }
@@ -27,18 +23,12 @@ const CONTACT_LIMIT = 100
 
 export function WaAccountPanel() {
   const [search, setSearch] = useState('')
-  const account = useQuery({
-    queryKey: ['wa', 'account'],
-    queryFn: () => apiFetch<AccountResp>('/api/wa/account'),
-    staleTime: 60_000,
-  })
   const contacts = useQuery({
     queryKey: ['wa', 'contacts'],
     queryFn: () => apiFetch<ContactsResp>('/api/wa/contacts'),
     staleTime: 60_000,
   })
 
-  const info = account.data?.sessionInfo
   const myContacts = useMemo(() => {
     const all = (contacts.data?.contacts ?? []).filter((c) => c.isMyContact)
     const q = search.trim().toLowerCase()
@@ -55,37 +45,7 @@ export function WaAccountPanel() {
   return (
     <Stack gap="md">
       <Title order={4}>Info Akun</Title>
-      {account.isError && (
-        <Alert color="red" variant="light">
-          {(account.error as Error).message}
-        </Alert>
-      )}
-      <Card withBorder padding="md">
-        {account.isLoading ? (
-          <Loader size="sm" />
-        ) : (
-          <Stack gap={4}>
-            <Group gap="xs">
-              <Text size="sm" fw={600}>
-                Nama:
-              </Text>
-              <Text size="sm">{info?.pushname ?? '—'}</Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="sm" fw={600}>
-                Nomor:
-              </Text>
-              <Text size="sm">{info?.wid?.user ?? '—'}</Text>
-            </Group>
-            <Group gap="xs">
-              <Text size="sm" fw={600}>
-                Platform:
-              </Text>
-              <Text size="sm">{info?.platform ?? '—'}</Text>
-            </Group>
-          </Stack>
-        )}
-      </Card>
+      <WaAccountSummary />
 
       <Group justify="space-between">
         <Title order={5}>Kontak ({myContacts.length})</Title>

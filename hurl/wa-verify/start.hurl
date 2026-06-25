@@ -2,7 +2,10 @@
 #
 # Alur lengkap (baca berurutan): start.hurl → manusia kirim token via WhatsApp → poll.hurl
 #
-# Jalankan manual (semua nilai via --variable, tak ada secret di file):
+# Jalankan manual — nilai dari .env (salin dari .env.example, ter-gitignore):
+#   hurl --variables-file hurl/wa-verify/.env hurl/wa-verify/start.hurl
+#
+# Atau override per-flag (tanpa file):
 #   hurl --variable base_url=http://localhost:3111 \
 #        --variable api_key=wav_sk_xxx \
 #        --variable expected_phone=628123456789 \

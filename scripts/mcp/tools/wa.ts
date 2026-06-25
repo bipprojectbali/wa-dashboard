@@ -96,6 +96,26 @@ export const waReadonlyTools: ToolModule = {
     )
 
     server.registerTool(
+      'wa_messages',
+      {
+        title: 'WA chat messages',
+        description: 'Fetch one chat message history (fetchMessages) for a user id',
+        inputSchema: z.object({
+          userId: z.string().min(1).describe('WA session id (= dashboard user id)'),
+          chatId: z.string().min(1).describe('Chat id, e.g. 628xxx@c.us'),
+          limit: z.number().int().min(1).max(100).optional().describe('Max messages (default 50)'),
+        }),
+      },
+      async ({ userId, chatId, limit }) => {
+        try {
+          return jsonText(await wa.fetchChatMessages(userId, chatId, limit ?? 50))
+        } catch (e) {
+          return errText(e instanceof Error ? e.message : String(e))
+        }
+      },
+    )
+
+    server.registerTool(
       'wa_policy_get',
       {
         title: 'WA policy',

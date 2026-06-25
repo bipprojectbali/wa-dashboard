@@ -145,6 +145,26 @@ export function registerInspectTools(server: McpServer) {
   )
 
   server.registerTool(
+    'stg_wa_messages',
+    {
+      title: 'STG: WA chat messages',
+      description: 'Fetch one chat message history on staging via the wa_messages MCP tool (readonly).',
+      inputSchema: z.object({
+        userId: z.string().min(1).describe('WA session id (= dashboard user id)'),
+        chatId: z.string().min(1).describe('Chat id, e.g. 628xxx@c.us'),
+        limit: z.number().int().min(1).max(100).optional().describe('Max messages (default 50)'),
+      }),
+    },
+    async ({ userId, chatId, limit }) =>
+      stgResult(
+        await stgFetch('/mcp', {
+          method: 'POST',
+          body: JSON.stringify({ tool: 'wa_messages', input: limit ? { userId, chatId, limit } : { userId, chatId } }),
+        }),
+      ),
+  )
+
+  server.registerTool(
     'stg_wa_policy',
     {
       title: 'STG: WA anti-ban policy',
@@ -207,6 +227,17 @@ export function registerInspectTools(server: McpServer) {
           body: JSON.stringify({ tool: 'wa_verify_inbound', input: limit ? { limit } : {} }),
         }),
       ),
+  )
+
+  server.registerTool(
+    'stg_wa_verify_supervisor',
+    {
+      title: 'STG: WA verify supervisor state',
+      description:
+        'Get WAV capture poller state on staging (running, sessionId, watermark, masked server number) via GET /api/wa/verify/supervisor (SUPER_ADMIN cookie, falls back to MCP bearer). Readonly.',
+      inputSchema: z.object({}),
+    },
+    async () => stgResult(await stgFetch('/api/wa/verify/supervisor')),
   )
 
   registerInspectDataTools(server)

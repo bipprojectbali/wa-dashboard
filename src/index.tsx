@@ -187,10 +187,10 @@ cleanupAuditLogs().catch(console.error)
 setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
 
 // ─── WhatsApp Inbound Verify (WAV) ────────────────────
-import { startWaVerifySupervisor } from './lib/wa-verify-listener'
+import { startWaVerifySupervisor } from './lib/wa-verify-poller'
 import { sweepWaVerify } from './lib/wa-verify-sweep'
 
-// Listener WhatsApp always-on (capture token verifikasi masuk).
+// Supervisor polling always-on (capture token verifikasi masuk via getChats).
 startWaVerifySupervisor()
 
 // Expiry + webhook retry + cleanup inbound log. Jalan saat boot, lalu tiap menit

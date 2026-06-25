@@ -35,8 +35,14 @@ Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN`; `TicketStatus` = `OPEN | IN_P
 Model `Verify*` adalah fitur **WAV (WhatsApp Inbound Verification)**. `VerifyConsumer`
 = app eksternal terdaftar (API key di-hash, plaintext hanya sekali). `VerifyRequest`
 = satu sesi verifikasi (token one-time, status + delivery status webhook).
-`VerifyInboundLog` = audit mentah pesan masuk listener (nomor ter-mask, dibersihkan
-sweep ~24 jam). Tidak ada Redis key baru untuk WAV. Lihat `docs/WA-VERIFY.md`.
+`VerifyInboundLog` = audit mentah pesan masuk poller (nomor ter-mask, dibersihkan
+sweep ~24 jam). WAV memakai satu Redis key: `wa:verify:watermark:<sessionId>`
+(watermark capture poller, lihat tabel di bawah). Lihat `docs/WA-VERIFY.md`.
+
+Halaman Simulasi Login (`/simulation`) memakai satu `VerifyConsumer` reserved bernama
+`[simulation]` (lazy-create idempoten via `getOrCreateSimConsumer`, `webhookUrl=null` →
+polling-only). Request simulasi adalah `VerifyRequest` biasa milik consumer itu — tak ada
+tabel/schema baru. Lihat `docs/WA-VERIFY.md`.
 
 ### Seed (`prisma/seed.ts`)
 
@@ -65,6 +71,7 @@ import { redis } from './lib/redis'
 | `wa:rl:recip:<userId>:<chatId>` | marker cooldown per nomor, TTL = cooldown | `src/lib/wa-policy.ts` |
 | `wa:rl:min\|hour\|day:<userId>` | counter kirim, TTL 60/3600/86400 | `src/lib/wa-policy.ts` |
 | `wa:avatar:<userId>:<contactId>` | URL foto profil kontak (string; `""` = tidak punya / upstream error), TTL 3600s sukses · 300s error | `src/routes/wa.client.ts` |
+| `wa:verify:watermark:<sessionId>` | epoch ms pesan terakhir diproses capture poller WAV, tanpa TTL | `src/lib/wa-verify-poller.ts` |
 
 ### App Logs (`src/lib/applog.ts`)
 
@@ -79,7 +86,7 @@ Logs API requests via `onAfterResponse` hook (skips `/api/auth/*`). Auto-rotates
 ## Audit Logs (DB)
 
 Persistent user activity trail in `AuditLog` table.
-Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`, `WA_VERIFY_CONSUMER_CREATED`, `WA_VERIFY_CONSUMER_UPDATED`, `WA_VERIFY_CONSUMER_DELETED`, `WA_VERIFY_KEY_REGENERATED`, `WA_VERIFY_REPLAY`, `WA_SESSION_TERMINATED`
+Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`, `WA_VERIFY_CONSUMER_CREATED`, `WA_VERIFY_CONSUMER_UPDATED`, `WA_VERIFY_CONSUMER_DELETED`, `WA_VERIFY_KEY_REGENERATED`, `WA_VERIFY_SECRET_REVEALED`, `WA_VERIFY_REPLAY`, `WA_VERIFY_REQUESTS_DELETED`, `WA_VERIFY_INBOUND_DELETED`, `WA_VERIFY_SIM_START`, `WA_SESSION_TERMINATED`
 Auto-cleanup: records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) — runs on startup + every 24h.
 
 ## WhatsApp API (wwebjs-api container)

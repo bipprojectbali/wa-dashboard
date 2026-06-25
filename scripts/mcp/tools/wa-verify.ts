@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { prisma } from '../../../src/lib/db'
+import { getSupervisorState } from '../../../src/lib/wa-verify-poller'
 import { maskPhone } from '../../../src/lib/wa-verify'
 import { replayWebhook } from '../../../src/lib/wa-verify-webhook'
 import { errText, jsonText, type ToolModule } from './shared'
@@ -87,6 +88,22 @@ export const waVerifyReadonlyTools: ToolModule = {
             take: limit ?? 50,
           })
           return jsonText(inbound)
+        } catch (e) {
+          return errText(e instanceof Error ? e.message : String(e))
+        }
+      },
+    )
+
+    server.registerTool(
+      'wa_verify_supervisor',
+      {
+        title: 'WA verify supervisor state',
+        description: 'WAV capture poller state (running, sessionId, watermark, server number masked)',
+        inputSchema: z.object({}),
+      },
+      async () => {
+        try {
+          return jsonText(getSupervisorState())
         } catch (e) {
           return errText(e instanceof Error ? e.message : String(e))
         }

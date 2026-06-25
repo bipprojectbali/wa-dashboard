@@ -1,5 +1,19 @@
-import { Badge, Card, Code, Divider, Group, List, Stack, Text, ThemeIcon, Title } from '@mantine/core'
-import { TbArrowRight, TbInfoCircle, TbShieldCheck } from 'react-icons/tb'
+import {
+  ActionIcon,
+  Badge,
+  Card,
+  Code,
+  Collapse,
+  Divider,
+  Group,
+  List,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
+} from '@mantine/core'
+import { useDisclosure } from '@mantine/hooks'
+import { TbArrowRight, TbChevronDown, TbChevronUp, TbInfoCircle, TbShieldCheck } from 'react-icons/tb'
 
 const STEPS = [
   {
@@ -57,65 +71,81 @@ const STEPS = [
 ]
 
 export function WaVerifyGuide() {
+  const [opened, { toggle }] = useDisclosure(false)
+
   return (
     <Card withBorder padding="md">
       <Stack gap="sm">
-        <Group gap="xs">
-          <ThemeIcon variant="light" color="teal" size="md">
-            <TbShieldCheck size={18} />
-          </ThemeIcon>
-          <Title order={5}>Cara Kerja Verifikasi Nomor</Title>
+        <Group gap="xs" justify="space-between" wrap="nowrap">
+          <Group gap="xs" wrap="nowrap">
+            <ThemeIcon variant="light" color="teal" size="md">
+              <TbShieldCheck size={18} />
+            </ThemeIcon>
+            <Title order={5}>Cara Kerja Verifikasi Nomor</Title>
+          </Group>
+          <ActionIcon
+            variant="subtle"
+            color="gray"
+            onClick={toggle}
+            aria-label={opened ? 'Tutup panduan' : 'Buka panduan'}
+          >
+            {opened ? <TbChevronUp size={18} /> : <TbChevronDown size={18} />}
+          </ActionIcon>
         </Group>
 
-        <Text size="sm" c="dimmed">
-          Verifikasi kepemilikan nomor pola <b>inbound (proof-of-possession)</b>: user membuktikan kepemilikan dengan{' '}
-          mengirim token ke nomor server, bukan server yang mengirim OTP keluar. Pola ini di luar jangkauan kebijakan
-          anti-ban OTP WhatsApp.
-        </Text>
-
-        <List type="ordered" spacing="sm" size="sm" center>
-          {STEPS.map((s) => (
-            <List.Item
-              key={s.title}
-              icon={
-                <ThemeIcon color="teal" size={22} radius="xl">
-                  <TbArrowRight size={14} />
-                </ThemeIcon>
-              }
-            >
-              <Text size="sm" fw={600}>
-                {s.title}
-              </Text>
-              <Text size="sm" c="dimmed" component="div">
-                {s.body}
-              </Text>
-            </List.Item>
-          ))}
-        </List>
-
-        <Divider />
-
-        <Group gap="xs" align="flex-start" wrap="nowrap">
-          <ThemeIcon variant="light" color="blue" size="md">
-            <TbInfoCircle size={18} />
-          </ThemeIcon>
-          <Stack gap={4}>
-            <Text size="sm" fw={600}>
-              Mode Login vs Discovery
-            </Text>
+        <Collapse in={opened}>
+          <Stack gap="sm">
             <Text size="sm" c="dimmed">
-              Saat memanggil <Code>start</Code>, app boleh menyertakan <Code>expectedPhone</Code>. Diisi = <b>Login</b>{' '}
-              (app sudah tahu nomor yang diharapkan, lalu membandingkan sendiri <Code>matchedPhone</Code> vs nomor
-              akun). Kosong = <b>Discovery</b> (nomor pengirim token menjadi nomor terverifikasi — cocok untuk
-              pendaftaran nomor baru).
+              Verifikasi kepemilikan nomor pola <b>inbound (proof-of-possession)</b>: user membuktikan kepemilikan
+              dengan mengirim token ke nomor server, bukan server yang mengirim OTP keluar. Pola ini di luar jangkauan
+              kebijakan anti-ban OTP WhatsApp.
+            </Text>
+
+            <List type="ordered" spacing="sm" size="sm" center>
+              {STEPS.map((s) => (
+                <List.Item
+                  key={s.title}
+                  icon={
+                    <ThemeIcon color="teal" size={22} radius="xl">
+                      <TbArrowRight size={14} />
+                    </ThemeIcon>
+                  }
+                >
+                  <Text size="sm" fw={600}>
+                    {s.title}
+                  </Text>
+                  <Text size="sm" c="dimmed" component="div">
+                    {s.body}
+                  </Text>
+                </List.Item>
+              ))}
+            </List>
+
+            <Divider />
+
+            <Group gap="xs" align="flex-start" wrap="nowrap">
+              <ThemeIcon variant="light" color="blue" size="md">
+                <TbInfoCircle size={18} />
+              </ThemeIcon>
+              <Stack gap={4}>
+                <Text size="sm" fw={600}>
+                  Mode Login vs Discovery
+                </Text>
+                <Text size="sm" c="dimmed">
+                  Saat memanggil <Code>start</Code>, app boleh menyertakan <Code>expectedPhone</Code>. Diisi ={' '}
+                  <b>Login</b> (app sudah tahu nomor yang diharapkan, lalu membandingkan sendiri{' '}
+                  <Code>matchedPhone</Code> vs nomor akun). Kosong = <b>Discovery</b> (nomor pengirim token menjadi
+                  nomor terverifikasi — cocok untuk pendaftaran nomor baru).
+                </Text>
+              </Stack>
+            </Group>
+
+            <Text size="xs" c="dimmed">
+              Kontrak teknis lengkap (format token, isolasi, payload & tanda tangan webhook) ada di{' '}
+              <Code>docs/WA-VERIFY.md</Code> pada repo.
             </Text>
           </Stack>
-        </Group>
-
-        <Text size="xs" c="dimmed">
-          Kontrak teknis lengkap (format token, isolasi, payload & tanda tangan webhook) ada di{' '}
-          <Code>docs/WA-VERIFY.md</Code> pada repo.
-        </Text>
+        </Collapse>
       </Stack>
     </Card>
   )

@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import { prisma } from '../../src/lib/db'
 import {
+  buildVerifyInstruction,
+  buildVerifyMessage,
   extractToken,
   generateToken,
   handleInbound,
@@ -38,6 +40,35 @@ describe('wa-verify: extractToken', () => {
 
   test('does not match a malformed token (wrong length)', () => {
     expect(extractToken('WAV-ABC')).toBeNull()
+  })
+
+  test('matches a lowercased token (phone autocorrect) and normalizes to uppercase', () => {
+    expect(extractToken('verifikasi nomor saya: wav-abcd2345')).toBe('WAV-ABCD2345')
+  })
+
+  test('matches a mixed-case token embedded in a sentence', () => {
+    expect(extractToken('Verifikasi nomor saya: Wav-AbCd2345')).toBe('WAV-ABCD2345')
+  })
+})
+
+describe('wa-verify: buildVerifyMessage / buildVerifyInstruction', () => {
+  test('message wraps the token in a natural sentence with token at the end', () => {
+    const msg = buildVerifyMessage('WAV-ABCD2345')
+    expect(msg).toBe('Verifikasi nomor saya: WAV-ABCD2345')
+    // Token tetap terdeteksi matcher walau dikelilingi kata penjelasan.
+    expect(extractToken(msg)).toBe('WAV-ABCD2345')
+  })
+
+  test('instruction includes the exact message and the server number when provided', () => {
+    const instr = buildVerifyInstruction('WAV-ABCD2345', '628123456789')
+    expect(instr).toContain('628123456789')
+    expect(instr).toContain('Verifikasi nomor saya: WAV-ABCD2345')
+  })
+
+  test('instruction omits the target phrase when no server number', () => {
+    const instr = buildVerifyInstruction('WAV-ABCD2345', null)
+    expect(instr).not.toContain(' ke ')
+    expect(instr).toContain('Verifikasi nomor saya: WAV-ABCD2345')
   })
 })
 
@@ -111,6 +142,20 @@ describe('wa-verify: handleInbound', () => {
     expect(second.matched).toBe(false)
   })
 
+  test('matches a lowercased inbound token against the stored uppercase token', async () => {
+    const token = generateToken()
+    const req = await prisma.verifyRequest.create({
+      data: { consumerId, token, expiresAt: new Date(Date.now() + TOKEN_TTL_MS) },
+      select: { id: true },
+    })
+    // Simulasikan autocorrect HP yang menurunkan huruf token jadi kecil.
+    const res = await handleInbound('session-1', inbound(`Verifikasi nomor saya: ${token.toLowerCase()}`))
+    expect(res.matched).toBe(true)
+    expect(res.requestId).toBe(req.id)
+    const after = await prisma.verifyRequest.findUnique({ where: { id: req.id } })
+    expect(after?.status).toBe('VERIFIED')
+  })
+
   test('does not match an expired request', async () => {
     const token = generateToken()
     await prisma.verifyRequest.create({
@@ -118,6 +163,20 @@ describe('wa-verify: handleInbound', () => {
     })
     const res = await handleInbound('session-1', inbound(`kode ${token}`))
     expect(res.matched).toBe(false)
+  })
+
+  test('accepts a @lid sender (inbound id variant) and verifies', async () => {
+    const token = generateToken()
+    const req = await prisma.verifyRequest.create({
+      data: { consumerId, token, expiresAt: new Date(Date.now() + TOKEN_TTL_MS) },
+      select: { id: true },
+    })
+    const res = await handleInbound('session-1', inbound(`kode ${token}`, '75218483707904@lid'))
+    expect(res.matched).toBe(true)
+    expect(res.requestId).toBe(req.id)
+    const after = await prisma.verifyRequest.findUnique({ where: { id: req.id } })
+    expect(after?.status).toBe('VERIFIED')
+    expect(after?.matchedPhone).toBe('75218483707904')
   })
 
   test('ignores group messages (@g.us)', async () => {

@@ -9,7 +9,10 @@ import { prisma } from './db'
 // Alfabet base32 tanpa karakter ambigu (tanpa 0/1/8/9, O/I/L/B). Token = WAV- + 8 char.
 const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ234567'
 const TOKEN_LEN = 8
-const TOKEN_REGEX = /\bWAV-[0-9A-Z]{8}\b/
+// Case-insensitive (flag i): keyboard HP kerap meng-autocapitalize/autocorrect, jadi token
+// yang diketik user bisa berubah huruf besar/kecil. Hasil match dinormalisasi ke uppercase
+// (lihat extractToken) sebelum lookup, karena token tersimpan uppercase.
+const TOKEN_REGEX = /\bWAV-[0-9A-Z]{8}\b/i
 export const TOKEN_TTL_MS = 5 * 60 * 1000 // 5 menit
 
 export function generateToken(): string {
@@ -21,11 +24,26 @@ export function generateToken(): string {
   return `WAV-${out}`
 }
 
-// Cari token dalam isi pesan. Mengembalikan token utuh (mis. "WAV-ABCD2345") atau null.
+// Cari token dalam isi pesan. Token boleh dikelilingi kata penjelasan (batas kata \b),
+// dan boleh huruf besar/kecil — dinormalisasi ke uppercase agar cocok dengan token tersimpan.
+// Mengembalikan token utuh (mis. "WAV-ABCD2345") atau null.
 export function extractToken(body: string | null | undefined): string | null {
   if (!body) return null
   const m = body.match(TOKEN_REGEX)
-  return m ? m[0] : null
+  return m ? m[0].toUpperCase() : null
+}
+
+// Pesan natural yang dikirim user ke nomor server. Token diletakkan di AKHIR kalimat agar
+// batas kata (\b) matcher tetap bersih dan enak dibaca manusia — bukan token telanjang.
+export function buildVerifyMessage(token: string): string {
+  return `Verifikasi nomor saya: ${token}`
+}
+
+// Instruksi yang dikembalikan ke consumer/operator pada response start. Menampilkan kalimat
+// PERSIS yang harus dikirim user (lewat buildVerifyMessage) agar tak ada celah salah ketik.
+export function buildVerifyInstruction(token: string, serverNumber?: string | null): string {
+  const target = serverNumber ? ` ke ${serverNumber}` : ''
+  return `Kirim pesan berikut via WhatsApp${target}: "${buildVerifyMessage(token)}"`
 }
 
 // Buang suffix WA (@c.us / @g.us) → sisakan digit nomor.
@@ -74,7 +92,9 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
   // listener juga sudah memfilter, tapi matcher tetap defensif.
   if (message.fromMe === true) return { matched: false }
   const from = message.from ?? ''
-  if (!from.endsWith('@c.us')) return { matched: false }
+  // Terima pengirim personal @c.us DAN @lid (varian id pengirim WA pada pesan
+  // inbound), tetap tolak grup @g.us & broadcast.
+  if (!from.endsWith('@c.us') && !from.endsWith('@lid')) return { matched: false }
 
   const phone = normalizePhone(from)
   const masked = maskPhone(phone)

@@ -1,7 +1,9 @@
 import { Elysia, t } from 'elysia'
+import type { Prisma } from '../../generated/prisma/client'
 import { appLog } from '../lib/applog'
 import { betterAuthPlugin } from '../lib/auth-middleware'
 import { prisma } from '../lib/db'
+import { parsePagination } from '../lib/pagination'
 import { audit, getIp, guardAdmin, guardSuperAdmin } from '../lib/route-helpers'
 import { generateApiKey, generateWebhookSecret } from '../lib/wa-verify-keys'
 
@@ -15,28 +17,45 @@ const consumerBody = t.Object({
   active: t.Optional(t.Boolean()),
 })
 
+// Body bulk-delete bersama untuk semua resource WAV: pilih beberapa (ids) atau semua (all).
+const bulkDeleteBody = t.Object({
+  ids: t.Optional(t.Array(t.String(), { maxItems: 500 })),
+  all: t.Optional(t.Boolean()),
+})
+
 export const waVerifyAdminRouter = new Elysia({ tags: ['WA Verify'] })
   .use(betterAuthPlugin)
 
   .get(
     '/api/wa/verify/consumers',
-    async ({ authUser }) => {
+    async ({ authUser, query }) => {
       const guard = guardAdmin(authUser)
       if (guard) return guard
-      const consumers = await prisma.verifyConsumer.findMany({
-        select: {
-          id: true,
-          name: true,
-          apiKeyPrefix: true,
-          webhookUrl: true,
-          active: true,
-          createdAt: true,
-          _count: { select: { requests: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 200,
-      })
-      return { consumers, canEdit: authUser!.role === 'SUPER_ADMIN' }
+      const { limit, offset } = parsePagination(query)
+      const where: Prisma.VerifyConsumerWhereInput = {}
+      const search = String(query.search ?? '').trim()
+      if (search) where.name = { contains: search, mode: 'insensitive' }
+      if (query.active === 'true') where.active = true
+      else if (query.active === 'false') where.active = false
+      const [consumers, total] = await prisma.$transaction([
+        prisma.verifyConsumer.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            apiKeyPrefix: true,
+            webhookUrl: true,
+            active: true,
+            createdAt: true,
+            _count: { select: { requests: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+          skip: offset,
+        }),
+        prisma.verifyConsumer.count({ where }),
+      ])
+      return { consumers, total, canEdit: authUser!.role === 'SUPER_ADMIN' }
     },
     { detail: { summary: 'List verify consumers', security: [{ cookieAuth: [] }] } },
   )
@@ -106,6 +125,25 @@ export const waVerifyAdminRouter = new Elysia({ tags: ['WA Verify'] })
     { detail: { summary: 'Regenerate consumer API key (SUPER_ADMIN)', security: [{ cookieAuth: [] }] } },
   )
 
+  .get(
+    '/api/wa/verify/consumers/:id/reveal-secret',
+    async ({ authUser, params, request }) => {
+      const guard = guardSuperAdmin(authUser)
+      if (guard) return guard
+      // webhookSecret disimpan plaintext (beda dari apiKey yang di-hash) → boleh
+      // di-reveal ulang. Konsumen butuh ini untuk verifikasi HMAC webhook.
+      const consumer = await prisma.verifyConsumer.findUnique({
+        where: { id: params.id },
+        select: { webhookSecret: true },
+      })
+      if (!consumer) return new Response(JSON.stringify({ error: 'Consumer tidak ditemukan.' }), { status: 404 })
+      audit(authUser!.id, 'WA_VERIFY_SECRET_REVEALED', `id=${params.id}`, getIp(request))
+      appLog('info', `WA verify webhook secret revealed by ${authUser!.email}`, `id=${params.id}`)
+      return { webhookSecret: consumer.webhookSecret }
+    },
+    { detail: { summary: 'Reveal webhook secret (SUPER_ADMIN)', security: [{ cookieAuth: [] }] } },
+  )
+
   .delete(
     '/api/wa/verify/consumers/:id',
     async ({ authUser, params, request }) => {
@@ -118,4 +156,28 @@ export const waVerifyAdminRouter = new Elysia({ tags: ['WA Verify'] })
       return { ok: true }
     },
     { detail: { summary: 'Delete verify consumer (SUPER_ADMIN)', security: [{ cookieAuth: [] }] } },
+  )
+
+  .post(
+    '/api/wa/verify/consumers/bulk-delete',
+    async ({ authUser, body, request }) => {
+      const guard = guardSuperAdmin(authUser)
+      if (guard) return guard
+      // all=true → wipe semua; selain itu hapus subset by ids. Cascade ke requests otomatis.
+      const where = body.all ? {} : { id: { in: body.ids ?? [] } }
+      if (!body.all && (body.ids?.length ?? 0) === 0) return { count: 0 }
+      const { count } = await prisma.verifyConsumer.deleteMany({ where })
+      audit(
+        authUser!.id,
+        'WA_VERIFY_CONSUMER_DELETED',
+        body.all ? `bulk all count=${count}` : `bulk ids count=${count}`,
+        getIp(request),
+      )
+      appLog('warn', `WA verify consumers bulk-deleted by ${authUser!.email}`, `count=${count} all=${!!body.all}`)
+      return { count }
+    },
+    {
+      detail: { summary: 'Bulk delete verify consumers (SUPER_ADMIN)', security: [{ cookieAuth: [] }] },
+      body: bulkDeleteBody,
+    },
   )

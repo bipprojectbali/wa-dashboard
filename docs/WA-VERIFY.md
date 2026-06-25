@@ -25,8 +25,8 @@ Consumer app                Dashboard (WAV)            User
      │                            │   tampilkan token +  │
      │ ─────────────────────────────────────────────────►│
      │                            │                      │ kirim "WAV-XXXXXXXX"
-     │                            │   listener nangkap   │ via WhatsApp ke sendTo
-     │                            │ ◄─────────────────── (WS dari container)
+     │                            │   poller nangkap     │ via WhatsApp ke sendTo
+     │                            │ ◄─────────────────── (getChats polling 4s)
      │                            │  match → VERIFIED     │
      │  webhook push (HMAC)       │                      │
      │ ◄───────────────────────── │                      │
@@ -61,7 +61,14 @@ webhook gagal total. Webhook hanya notifikasi best-effort.
 
 - Format: `WAV-` + 8 karakter base32 tanpa ambigu.
 - Alfabet: `ABCDEFGHJKMNPQRSTUVWXYZ234567` (tanpa `0/1/8/9`, `O/I/L`).
-- Regex deteksi di pesan masuk: `/\bWAV-[0-9A-Z]{8}\b/`.
+- Regex deteksi di pesan masuk: `/\bWAV-[0-9A-Z]{8}\b/i` (**case-insensitive** —
+  keyboard HP kerap meng-autocapitalize/autocorrect; token yang terdeteksi
+  dinormalisasi ke uppercase sebelum lookup karena tersimpan uppercase).
+- **Token boleh dikelilingi kata penjelasan** (batas kata `\b`) — user tak harus
+  mengirim token telanjang. Instruksi default menyuruh user mengirim kalimat
+  `Verifikasi nomor saya: WAV-XXXXXXXX` (token di akhir agar batas kata bersih).
+  Pembangun pesan/instruksi: `buildVerifyMessage` & `buildVerifyInstruction`
+  (sumber tunggal, dipakai public router, sim router, dan pre-fill `wa.me`).
 - **One-time**: dijaga unique index + `updateMany` guard `status=PENDING` (satu
   pemenang race, idempoten terhadap pesan dobel dari reconnect).
 - **TTL 5 menit** (`TOKEN_TTL_MS`). Lewat itu → `EXPIRED` (live-check saat poll;
@@ -97,27 +104,46 @@ yang membaca `x-api-key`, resolve consumer **aktif**, inject `verifyConsumer` (a
 
 ---
 
-## Capture: supervisor always-on
+## Capture: supervisor polling always-on
 
-`src/lib/wa-verify-listener.ts` — `WaVerifySupervisor`. Listener WhatsApp hidup
-24/7 lepas dari browser (beda dari `wa-bridge.ts` yang browser-driven).
+`src/lib/wa-verify-poller.ts` — supervisor REST-polling hidup 24/7 lepas dari
+browser (beda dari `wa-bridge.ts` yang browser-driven). Menggantikan listener WS
+lama: WS upgrade ke container 502 di edge Cloudflare, jadi capture tak pernah
+tertangkap. Polling REST tahan NAT/proxy dan latency turun ke ~interval poll.
 
-1. **Reconcile loop** (`RECONCILE_MS = 30s` + sekali saat boot):
+Hanya **satu nomor server** yang didengarkan, ditentukan `WA_VERIFY_SERVER_NUMBER`
+(bukan tiap user) — token inbound selalu dikirim user ke nomor itu.
+
+1. **Reconcile loop** (`RECONCILE_MS = 30s` + sekali saat boot) →
+   `resolveServerSession()`:
    - `wa.getSessions()` → daftar session id di container.
-   - **Validasi tiap id terhadap DB**: hanya user `role ∈ {ADMIN, SUPER_ADMIN}` &
-     `blocked=false` yang didengarkan. Inilah filter yang mencegah mendengarkan
-     sesi asing.
-   - Session valid tanpa listener → buka WS persisten. Listener yang session-nya
-     hilang/invalid → tutup & lepas. Idempoten (keyed `Map<sessionId, Listener>`).
-2. **Per-session WS** ke `<WA_API_BASE_URL→ws>/ws/<sessionId>` dengan header
-   `x-api-key`. Reconnect backoff `min(1000·2^retry, 30s)`. Outbound
-   dashboard→container (tahan NAT), mirror mekanik `wa-bridge.ts`.
-3. **onmessage** → parse frame `{ dataType, data: { message }, sessionId }`; hanya
-   `dataType === 'message'`. Filter: `fromMe === false` & `from` diakhiri `@c.us`
-   (abaikan grup & pesan sendiri) → serahkan ke `handleInbound`.
+   - Cari id yang `getStatus` CONNECTED **dan** nomor akunnya
+     (`getClassInfo → sessionInfo.wid.user`, dibandingkan mentah, bukan ter-mask)
+     cocok dengan `normalizePhone(WA_VERIFY_SERVER_NUMBER)`. Balas id atau `null`.
+2. **Poll loop** (`POLL_INTERVAL_MS = 4s`) → `pollOnce(sessionId)`:
+   - `wa.getChats(sessionId)` → tiap chat punya `lastMessage { from, body, fromMe, timestamp }`
+     (`timestamp` = epoch **detik**; `t` hanya ada di payload mentah `_data` → fallback).
+   - Watermark per-session di Redis `wa:verify:watermark:<sessionId>` (epoch **ms**,
+     tanpa TTL). Bootstrap = `Date.now()` saat key belum ada → riwayat lama di-skip.
+   - `filterNewInbound(chats, watermark)` (fungsi pure, di-export untuk unit test):
+     pesan ikut bila `fromMe === false` & `timestamp*1000 > watermark`. Tiap pesan →
+     `handleInbound`. Watermark maju ke `timestamp` terbesar yang terlihat.
+3. **Matcher** (`handleInbound`, `src/lib/wa-verify.ts`) menerima pengirim personal
+   `@c.us` **dan** `@lid` (varian id pengirim pada pesan inbound nyata), menolak grup
+   `@g.us` & broadcast.
 
-Boot: `startWaVerifySupervisor()` dipanggil di `src/index.tsx` (sebelah
-`cleanupAuditLogs()`). Graceful no-op bila `WA_API_BASE_URL`/`WA_API_KEY` kosong.
+**Batasan diketahui:** `getChats` hanya membawa `lastMessage` per chat. Bila user
+kirim token lalu kirim pesan lain ke chat yang sama dalam **satu interval poll
+(≤4s)**, token bisa terlewat. Mitigasi: interval pendek (cukup untuk pola WAV: user
+kirim satu token lalu menunggu). `fetchMessages` per-chat sengaja tak dipakai (mahal).
+
+**Inspeksi:** state poller (`running`, `sessionId`, `watermark`, nomor server
+ter-mask, `lastPollAt`, `lastError`, `pollIntervalMs`) via `getSupervisorState()`,
+diekspos di `GET /api/wa/verify/supervisor` (guardAdmin — nomor ter-mask), MCP `wa_verify_supervisor`
+(debug-dev), dan `stg_wa_verify_supervisor` (debug-stg).
+
+Boot: `startWaVerifySupervisor()` dipanggil di `src/index.tsx`. Graceful no-op bila
+`WA_API_BASE_URL` / `WA_API_KEY` / `WA_VERIFY_SERVER_NUMBER` kosong.
 
 ---
 
@@ -150,7 +176,9 @@ juga dari sweep & replay manual.
 | `X-WAV-Attempt` | nomor attempt (`1`..`5`) |
 
 Consumer memverifikasi keaslian dengan menghitung ulang HMAC body memakai
-`webhookSecret` (diberikan saat consumer dibuat) dan membandingkan
+`webhookSecret` (muncul di modal saat consumer dibuat, dan bisa di-reveal ulang
+kapan saja lewat `GET /api/wa/verify/consumers/:id/reveal-secret` — secret
+disimpan plaintext, beda dari apiKey yang di-hash) dan membandingkan
 `X-WAV-Signature`.
 
 **Retry & status delivery** (kolom di `VerifyRequest`):
@@ -192,13 +220,14 @@ API key invalid / consumer non-aktif → **401**.
 | POST | `/api/wa/verify/consumers` | guardSuperAdmin | Buat consumer → balas `apiKey` **sekali** |
 | PUT | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Update name/webhookUrl/active (404 bila tak ada) |
 | POST | `/api/wa/verify/consumers/:id/regenerate-key` | guardSuperAdmin | Regen apiKey (balas sekali) |
+| GET | `/api/wa/verify/consumers/:id/reveal-secret` | guardSuperAdmin | Reveal `webhookSecret` plaintext (disimpan plaintext → boleh di-reveal ulang, beda dari apiKey yang di-hash). 404 bila tak ada |
 | DELETE | `/api/wa/verify/consumers/:id` | guardSuperAdmin | Hapus consumer (cascade requests) |
 | GET | `/api/wa/verify/requests` | guardAdmin | List request terbaru (`?limit` max 200), **matchedPhone ter-mask** |
-| GET | `/api/wa/verify/inbound` | guardSuperAdmin | Raw inbound log (`?limit` max 200) |
+| GET | `/api/wa/verify/inbound` | guardAdmin | Raw inbound log (`?limit` max 200) |
 | POST | `/api/wa/verify/requests/:id/replay` | guardSuperAdmin | Replay webhook (409 + reason bila gagal) |
 
 Audit actions: `WA_VERIFY_CONSUMER_CREATED/UPDATED/DELETED`, `WA_VERIFY_KEY_REGENERATED`,
-`WA_VERIFY_REPLAY`.
+`WA_VERIFY_SECRET_REVEALED`, `WA_VERIFY_REPLAY`.
 
 ---
 
@@ -217,9 +246,9 @@ Audit actions: `WA_VERIFY_CONSUMER_CREATED/UPDATED/DELETED`, `WA_VERIFY_KEY_REGE
 
 | Env | Default | Keterangan |
 |-----|---------|------------|
-| `WA_VERIFY_SERVER_NUMBER` | `''` | Nomor server tujuan kirim token (untuk `sendTo`/instruksi ke user). Bila kosong, consumer menampilkan nomor via UI sendiri. |
+| `WA_VERIFY_SERVER_NUMBER` | `''` | Nomor server tujuan kirim token (untuk `sendTo`/instruksi ke user) **dan** kunci yang dipakai supervisor untuk memilih session container yang di-poll. Bila kosong, supervisor idle (no-op). |
 
-Reuse `WA_API_BASE_URL` + `WA_API_KEY` (container wwebjs-api) untuk listener.
+Reuse `WA_API_BASE_URL` + `WA_API_KEY` (container wwebjs-api) untuk poller.
 
 ---
 
@@ -229,6 +258,27 @@ Tab **Verifikasi Nomor** di `/wa?tab=verify` (icon `TbShieldCheck`, ADMIN+SUPER_
 Komponen di `src/frontend/components/wa/`: `WaVerifyPanel` (orchestrator),
 `WaVerifyConsumers` (CRUD + apiKey modal sekali-tampil), `WaVerifyLogs` (request +
 replay), `WaVerifyInbound` (raw log, SUPER_ADMIN saja). Lihat `docs/FRONTEND.md`.
+
+## Simulasi Login (browser, pra-rilis)
+
+Route standalone `/simulation` (SUPER_ADMIN) menjalankan alur login WAV end-to-end
+lewat browser sebelum rilis: dari "halaman login palsu" → klik → buka WhatsApp dengan
+token terisi → operator kirim → dashboard poll sampai `VERIFIED`. Sifatnya uji, jadi
+ikut menampilkan **log timeline berstempel waktu** tiap langkah (untuk developer).
+
+**Proxy server-side (Opsi A)**: endpoint cookie-auth SUPER_ADMIN `/api/wa/verify/sim/*`
+menjalankan start/poll memakai consumer reserved `[simulation]` (lazy-create idempoten,
+`getOrCreateSimConsumer` di `src/lib/wa-verify-sim.ts`). **API key tak pernah ke browser**,
+tapi pipeline 100% asli. Request sim = `VerifyRequest` biasa → tertangkap poller & muncul di
+panel Requests. Inti start/poll dibagi public router via `src/lib/wa-verify-flow.ts`.
+
+**Kendala jujur**: deep-link `wa.me` hanya **pre-fill** teks (kalimat
+`Verifikasi nomor saya: WAV-XXXXXXXX`) — "kirim otomatis" mustahil (model keamanan
+WhatsApp/OS), operator tetap tap kirim. UI menyebut ini apa adanya.
+
+v1 hanya **mode Login** (`expectedPhone` diisi). QR via `GET /api/wa/verify/sim/:id/qr`
+(PNG, `qrcode` server-side — token di-lookup via id, bukan teks query arbitrer). Audit
+`WA_VERIFY_SIM_START`. Endpoint detail: `docs/API.md`. Komponen: `docs/FRONTEND.md`.
 
 ## E2E testing (Hurl + MCP)
 

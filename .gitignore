@@ -53,3 +53,6 @@ SOLUSI/
 qa/*
 !qa/README.md
 !qa/screenshot.sh
+
+# CodeGraph local index — pre-computed per-machine, bukan artefak repo
+.codegraph/

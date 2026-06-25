@@ -30,6 +30,7 @@ import {
   TbLayoutDashboard,
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
+  TbLogin2,
   TbLogout,
   TbMoon,
   TbRuler2,
@@ -275,6 +276,31 @@ function DevPage() {
               leftSection={<TbBrandWhatsapp size={18} />}
               rightSection={<TbChevronRight size={14} />}
               onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? (
+            <Tooltip label="Simulation" position="right">
+              <ActionIcon
+                variant="subtle"
+                color="violet"
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
+              >
+                <TbLogin2 size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="Simulation"
+              description="Uji alur WAV end-to-end"
+              leftSection={<TbLogin2 size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
               variant="light"
               mb={4}
             />

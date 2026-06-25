@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "agentation": {
-      "command": "npx",
-      "args": ["-y", "agentation-mcp", "server"]
-    },
     "wa-dashboard-deploy-stg": {
       "command": "bun",
       "args": ["run", "scripts/mcp/deploy.ts"],

@@ -100,6 +100,7 @@ describe('management: POST /api/wa/verify/consumers', () => {
     const body = await res.json()
     expect(body.apiKey).toMatch(/^wav_sk_/)
     expect(body.consumer.apiKeyPrefix).toBe(body.apiKey.slice(0, 12))
+    expect(body.consumer.webhookSecret).toMatch(/^whsec_/)
 
     // The plaintext key is never returned again on list.
     const list = await (await json('GET', '/api/wa/verify/consumers', undefined, superCookie)).json()
@@ -287,9 +288,42 @@ describe('management: POST /api/wa/verify/consumers/:id/regenerate-key', () => {
   })
 })
 
-describe('management: inbound log + delete are SUPER_ADMIN gated', () => {
-  test('GET /api/wa/verify/inbound → 403 for ADMIN', async () => {
-    expect((await json('GET', '/api/wa/verify/inbound', undefined, adminCookie)).status).toBe(403)
+describe('management: GET /api/wa/verify/consumers/:id/reveal-secret', () => {
+  let id: string
+  let createdSecret: string
+  beforeAll(async () => {
+    const created = await (
+      await json('POST', '/api/wa/verify/consumers', { name: 'wav-it-reveal' }, superCookie)
+    ).json()
+    id = created.consumer.id
+    createdSecret = created.consumer.webhookSecret
+  })
+
+  test('403 for ADMIN', async () => {
+    expect((await json('GET', `/api/wa/verify/consumers/${id}/reveal-secret`, undefined, adminCookie)).status).toBe(403)
+  })
+
+  test('404 for unknown id', async () => {
+    expect(
+      (await json('GET', '/api/wa/verify/consumers/nope/reveal-secret', undefined, superCookie)).status,
+    ).toBe(404)
+  })
+
+  test('200 for SUPER_ADMIN returns the same plaintext secret', async () => {
+    const res = await json('GET', `/api/wa/verify/consumers/${id}/reveal-secret`, undefined, superCookie)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.webhookSecret).toMatch(/^whsec_/)
+    expect(body.webhookSecret).toBe(createdSecret)
+  })
+})
+
+describe('management: inbound log readable by ADMIN, delete SUPER_ADMIN gated', () => {
+  test('GET /api/wa/verify/inbound → 200 for ADMIN (guard lowered, masked)', async () => {
+    const res = await json('GET', '/api/wa/verify/inbound', undefined, adminCookie)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body.inbound)).toBe(true)
   })
 
   test('GET /api/wa/verify/inbound → 200 for SUPER_ADMIN', async () => {
@@ -320,5 +354,155 @@ describe('management: inbound log + delete are SUPER_ADMIN gated', () => {
     expect(
       (await json('DELETE', `/api/wa/verify/consumers/${created.consumer.id}`, undefined, superCookie)).status,
     ).toBe(404)
+  })
+})
+
+describe('consumers: pagination + search + active filter', () => {
+  beforeAll(async () => {
+    // Wipe and seed a deterministic set: 3 active "wav-it-page-foo-*" + 2 inactive "wav-it-page-bar-*".
+    await prisma.verifyConsumer.deleteMany({ where: { name: { startsWith: 'wav-it' } } })
+    for (const n of ['foo-1', 'foo-2', 'foo-3']) {
+      await json('POST', '/api/wa/verify/consumers', { name: `wav-it-page-${n}` }, superCookie)
+    }
+    for (const n of ['bar-1', 'bar-2']) {
+      const c = await (await json('POST', '/api/wa/verify/consumers', { name: `wav-it-page-${n}` }, superCookie)).json()
+      await json('PUT', `/api/wa/verify/consumers/${c.consumer.id}`, { name: `wav-it-page-${n}`, active: false }, superCookie)
+    }
+  })
+
+  test('limit/offset paginate; total reflects full count', async () => {
+    const p1 = await (await json('GET', '/api/wa/verify/consumers?limit=2&offset=0', undefined, superCookie)).json()
+    expect(p1.total).toBe(5)
+    expect(p1.consumers.length).toBe(2)
+    const p2 = await (await json('GET', '/api/wa/verify/consumers?limit=2&offset=2', undefined, superCookie)).json()
+    expect(p2.consumers.length).toBe(2)
+    // No overlap between pages.
+    const ids1 = new Set(p1.consumers.map((c: { id: string }) => c.id))
+    expect(p2.consumers.some((c: { id: string }) => ids1.has(c.id))).toBe(false)
+  })
+
+  test('search narrows by name (case-insensitive)', async () => {
+    const res = await (await json('GET', '/api/wa/verify/consumers?search=FOO', undefined, superCookie)).json()
+    expect(res.total).toBe(3)
+    expect(res.consumers.every((c: { name: string }) => c.name.includes('foo'))).toBe(true)
+  })
+
+  test('active=true / active=false filter', async () => {
+    const act = await (await json('GET', '/api/wa/verify/consumers?active=true', undefined, superCookie)).json()
+    expect(act.total).toBe(3)
+    expect(act.consumers.every((c: { active: boolean }) => c.active)).toBe(true)
+    const inact = await (await json('GET', '/api/wa/verify/consumers?active=false', undefined, superCookie)).json()
+    expect(inact.total).toBe(2)
+    expect(inact.consumers.every((c: { active: boolean }) => !c.active)).toBe(true)
+  })
+})
+
+describe('consumers: POST bulk-delete', () => {
+  test('403 for ADMIN', async () => {
+    expect((await json('POST', '/api/wa/verify/consumers/bulk-delete', { all: true }, adminCookie)).status).toBe(403)
+  })
+
+  test('ids deletes only the selected subset', async () => {
+    const a = await (await json('POST', '/api/wa/verify/consumers', { name: 'wav-it-bulk-a' }, superCookie)).json()
+    const b = await (await json('POST', '/api/wa/verify/consumers', { name: 'wav-it-bulk-b' }, superCookie)).json()
+    const c = await (await json('POST', '/api/wa/verify/consumers', { name: 'wav-it-bulk-c' }, superCookie)).json()
+
+    const res = await json(
+      'POST',
+      '/api/wa/verify/consumers/bulk-delete',
+      { ids: [a.consumer.id, b.consumer.id] },
+      superCookie,
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).count).toBe(2)
+
+    // a, b gone; c survives — bulk by ids does not touch unselected rows.
+    expect(await prisma.verifyConsumer.findUnique({ where: { id: a.consumer.id } })).toBeNull()
+    expect(await prisma.verifyConsumer.findUnique({ where: { id: b.consumer.id } })).toBeNull()
+    expect(await prisma.verifyConsumer.findUnique({ where: { id: c.consumer.id } })).not.toBeNull()
+  })
+
+  test('empty ids is a no-op (count=0)', async () => {
+    const res = await json('POST', '/api/wa/verify/consumers/bulk-delete', { ids: [] }, superCookie)
+    expect((await res.json()).count).toBe(0)
+  })
+
+  test('all=true wipes every consumer', async () => {
+    const res = await json('POST', '/api/wa/verify/consumers/bulk-delete', { all: true }, superCookie)
+    expect(res.status).toBe(200)
+    expect((await res.json()).count).toBeGreaterThanOrEqual(1)
+    expect(await prisma.verifyConsumer.count()).toBe(0)
+  })
+})
+
+describe('requests + inbound: filter + bulk-delete', () => {
+  let consumerId: string
+  let apiKey: string
+
+  beforeAll(async () => {
+    const c = await (
+      await json('POST', '/api/wa/verify/consumers', { name: 'wav-it-rq' }, superCookie)
+    ).json()
+    consumerId = c.consumer.id
+    apiKey = c.apiKey
+    // Two PENDING requests via start.
+    for (let i = 0; i < 2; i++) {
+      await app.handle(
+        new Request('http://localhost/api/verify/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+          body: JSON.stringify({}),
+        }),
+      )
+    }
+    // Seed inbound logs directly (poller normally writes these).
+    await prisma.verifyInboundLog.createMany({
+      data: [
+        { sessionId: 'sess-rq', fromMasked: '6281****1111', tokenFound: 'WAV-AAAA1111', matched: true, consumerId },
+        { sessionId: 'sess-rq', fromMasked: '6281****2222', tokenFound: null, matched: false, consumerId: null },
+      ],
+    })
+  })
+
+  test('requests: status filter narrows; total correct', async () => {
+    const all = await (await json('GET', '/api/wa/verify/requests', undefined, superCookie)).json()
+    expect(all.total).toBeGreaterThanOrEqual(2)
+    const pending = await (
+      await json('GET', '/api/wa/verify/requests?status=PENDING', undefined, superCookie)
+    ).json()
+    expect(pending.requests.every((r: { status: string }) => r.status === 'PENDING')).toBe(true)
+    const verified = await (
+      await json('GET', '/api/wa/verify/requests?status=VERIFIED', undefined, superCookie)
+    ).json()
+    expect(verified.total).toBe(0)
+  })
+
+  test('requests: search by consumer name', async () => {
+    const res = await (await json('GET', '/api/wa/verify/requests?search=wav-it-rq', undefined, superCookie)).json()
+    expect(res.total).toBeGreaterThanOrEqual(2)
+    expect(res.requests.every((r: { consumer: { name: string } }) => r.consumer.name === 'wav-it-rq')).toBe(true)
+  })
+
+  test('requests: bulk-delete 403 for ADMIN, ids deletes subset', async () => {
+    const list = await (await json('GET', '/api/wa/verify/requests?search=wav-it-rq', undefined, superCookie)).json()
+    const id = list.requests[0].id
+    expect((await json('POST', '/api/wa/verify/requests/bulk-delete', { ids: [id] }, adminCookie)).status).toBe(403)
+    const res = await json('POST', '/api/wa/verify/requests/bulk-delete', { ids: [id] }, superCookie)
+    expect((await res.json()).count).toBe(1)
+    expect(await prisma.verifyRequest.findUnique({ where: { id } })).toBeNull()
+  })
+
+  test('inbound: matched filter + search by masked number', async () => {
+    const matched = await (await json('GET', '/api/wa/verify/inbound?matched=true', undefined, superCookie)).json()
+    expect(matched.inbound.every((r: { matched: boolean }) => r.matched)).toBe(true)
+    const byNum = await (await json('GET', '/api/wa/verify/inbound?search=1111', undefined, superCookie)).json()
+    expect(byNum.inbound.every((r: { fromMasked: string }) => r.fromMasked.includes('1111'))).toBe(true)
+  })
+
+  test('inbound: bulk-delete all wipes logs (SUPER_ADMIN)', async () => {
+    expect((await json('POST', '/api/wa/verify/inbound/bulk-delete', { all: true }, adminCookie)).status).toBe(403)
+    const res = await json('POST', '/api/wa/verify/inbound/bulk-delete', { all: true }, superCookie)
+    expect(res.status).toBe(200)
+    expect(await prisma.verifyInboundLog.count()).toBe(0)
   })
 })

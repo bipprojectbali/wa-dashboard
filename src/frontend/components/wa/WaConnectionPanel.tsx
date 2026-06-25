@@ -18,6 +18,7 @@ import { useState } from 'react'
 import { TbCopy, TbCopyCheck, TbPlugConnected, TbRefresh, TbTrash } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/apiFetch'
 import { type PairingResp, pairingCodeOrThrow } from '@/frontend/lib/wa-pairing'
+import { WaAccountSummary } from './WaAccountSummary'
 
 interface StatusResp {
   success: boolean
@@ -128,6 +129,8 @@ export function WaConnectionPanel({ wsReady }: { wsReady: boolean }) {
           Terminate
         </Button>
       </Group>
+
+      {connected && <WaAccountSummary enabled={connected} />}
 
       {needsQr && (
         <Card withBorder padding="md">
