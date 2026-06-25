@@ -70,13 +70,19 @@ export function scanCredentials(branch: string): { ok: boolean; issues: { type: 
   return { ok: issues.length === 0, issues }
 }
 
+// Template env files are documented as safe to commit (only real .env/.env.* hold secrets).
+const SENSITIVE_FILE_ALLOWLIST = [/^\.env\.(example|sample|template)$/]
+
+export function isSensitiveFile(path: string): boolean {
+  const base = path.split('/').pop() ?? path
+  if (SENSITIVE_FILE_ALLOWLIST.some((p) => p.test(base))) return false
+  return SENSITIVE_FILE_PATTERNS.some((p) => p.test(base))
+}
+
 export function scanSensitiveFiles(branch: string): { ok: boolean; files: string[] } {
   const result = run(`git diff --name-only origin/${branch}..HEAD`)
   const files = result.ok ? result.out.split('\n').filter(Boolean) : []
-  const flagged = files.filter((f) => {
-    const base = f.split('/').pop() ?? f
-    return SENSITIVE_FILE_PATTERNS.some((p) => p.test(base))
-  })
+  const flagged = files.filter(isSensitiveFile)
   return { ok: flagged.length === 0, files: flagged }
 }
 
