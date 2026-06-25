@@ -21,7 +21,7 @@
     "db:generate": "bunx --bun prisma generate",
     "db:push": "bunx --bun prisma db push",
     "build:migrate": "bun build scripts/migrate.ts --compile --target=bun-linux-x64 --outfile migrate",
-    "build:server": "bun build src/server.prod.ts --compile --target=bun-linux-x64 --outfile server"
+    "build:server": "bun scripts/build-server.ts"
   },
   "dependencies": {
     "@elysiajs/cors": "^1.4.1",

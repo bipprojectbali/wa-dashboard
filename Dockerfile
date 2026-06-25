@@ -25,10 +25,9 @@ RUN bun build scripts/migrate.ts \
       --compile --target=bun-linux-x64 \
       --outfile migrate
 
-# Compile server binary — bundles all npm deps including Prisma client
-RUN bun build src/server.prod.ts \
-      --compile --target=bun-linux-x64 \
-      --outfile server
+# Compile server binary — bundles all npm deps including Prisma client.
+# Uses a build script that stubs @scalar/themes (see scripts/build-server.ts).
+RUN bun run build:server
 
 # ── Runtime (lean — no node_modules, no bun runtime needed) ──────────────────
 # debian:bookworm-slim (~90MB) vs oven/bun:1 (~220MB) — binary is self-contained,
