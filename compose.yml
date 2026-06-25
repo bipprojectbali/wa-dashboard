@@ -22,6 +22,29 @@ services:
       - "traefik.http.routers.wa-dashboard.tls=true"
       - "traefik.http.routers.wa-dashboard.tls.certresolver=letsencrypt"
       - "traefik.http.services.wa-dashboard.loadbalancer.server.port=3000"
+    environment:
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - GH_REPO=${GH_REPO}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - HMR_PORT=${HMR_PORT}
+      - MCP_SECRET=${MCP_SECRET}
+      - NODE_ENV=${NODE_ENV}
+      - PORT=${PORT}
+      - REDIS_URL=${REDIS_URL}
+      - STACK_NAME=${STACK_NAME}
+      - STG_BASE_URL=${STG_BASE_URL}
+      - STG_STACK_NAME=${STG_STACK_NAME}
+      - SUPER_ADMIN_EMAIL=${SUPER_ADMIN_EMAIL}
+      - TELEGRAM_NOTIFY_CHAT_ID=${TELEGRAM_NOTIFY_CHAT_ID}
+      - TELEGRAM_NOTIFY_TOKEN=${TELEGRAM_NOTIFY_TOKEN}
+      - WA_API_BASE_URL=${WA_API_BASE_URL}
+      - WA_API_KEY=${WA_API_KEY}
+      - WA_VERIFY_SERVER_NUMBER=${WA_VERIFY_SERVER_NUMBER}
+
 
 networks:
   public-net:

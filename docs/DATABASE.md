@@ -9,6 +9,21 @@ import { prisma } from './lib/db'
 
 Commands: `bun run db:migrate` | `bun run db:seed` | `bun run db:generate`
 
+### Connection URLs (PgBouncer-aware)
+
+Dua env terpisah karena runtime dan migration butuh jenis koneksi berbeda:
+
+| Env | Dipakai | Tujuan | Di prod/stg |
+|-----|---------|--------|-------------|
+| `DATABASE_URL` | runtime app (`src/lib/db.ts` via `PrismaPg` adapter) | banyak koneksi pendek | **PgBouncer** (`:6432`, transaction-mode) |
+| `DIRECT_URL` | `prisma migrate` / `db:generate` (`prisma.config.ts`) | session-level (advisory lock + DDL transaction) | **Postgres langsung** (`:5432`) |
+
+`prisma migrate` butuh koneksi session-level yang **tidak didukung** PgBouncer
+transaction-mode → arahkan migration ke `DIRECT_URL`. `prisma.config.ts` memakai
+`process.env.DIRECT_URL || env('DATABASE_URL')`, jadi dev lokal tanpa PgBouncer cukup
+kosongkan `DIRECT_URL` (otomatis fallback). Runtime app tetap selalu lewat
+`DATABASE_URL` (PgBouncer) tanpa perlu gonta-ganti saat migrasi.
+
 ### Schema (`prisma/schema.prisma`)
 
 | Model | Key Fields |

@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.4] - 2026-06-25
+
+### Fixed
+- **Migrasi di staging dengan PgBouncer** — `prisma migrate` tidak lagi mengharuskan menukar `DATABASE_URL` ke alamat Postgres langsung secara manual setiap kali ada migrasi. Penyebab: migration butuh koneksi *session-level* (advisory lock + transaksi DDL) yang tidak didukung PgBouncer transaction-mode, sementara runtime app justru harus lewat PgBouncer. Solusi: `prisma.config.ts` kini memakai `DIRECT_URL` untuk migration (`process.env.DIRECT_URL || env('DATABASE_URL')`), sedangkan runtime app (`src/lib/db.ts`) tetap lewat `DATABASE_URL`. Set `DATABASE_URL` → PgBouncer (`:6432`) dan `DIRECT_URL` → Postgres langsung (`:5432`); dev lokal tanpa PgBouncer cukup kosongkan `DIRECT_URL` (fallback otomatis). `compose.yml` meneruskan `DIRECT_URL` ke container.
+
 ## [0.1.3] - 2026-06-25
 
 ### Fixed
