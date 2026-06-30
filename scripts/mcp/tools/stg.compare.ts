@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { jsonText } from './shared'
-import { MCP_SECRET, stgFetch, stgResult } from './stg-fetch'
+import { MCP_SECRET, mcpCallBody, stgFetch, stgMcpCall, unwrapMcpEnvelope } from './stg-fetch'
 
 export function registerCompareTools(server: McpServer) {
   server.registerTool(
@@ -179,15 +179,18 @@ export function registerCompareTools(server: McpServer) {
       const localUrl = localBaseUrl.replace(/\/$/, '')
       const localAuth = `Bearer ${localSecret ?? MCP_SECRET}`
       const [stgRes, localRes] = await Promise.all([
-        stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'db_list_users', input: { limit: 500 } }),
-        }),
+        stgMcpCall('db_list_users', { limit: 500 }),
         fetch(`${localUrl}/mcp`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: localAuth },
-          body: JSON.stringify({ tool: 'db_list_users', input: { limit: 500 } }),
-        }).then(async (r) => ({ status: r.status, ok: r.ok, data: await r.json().catch(() => null) })),
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            Authorization: localAuth,
+          },
+          body: mcpCallBody('db_list_users', { limit: 500 }),
+        })
+          .then(async (r) => ({ status: r.status, ok: r.ok, data: await r.json().catch(() => null) }))
+          .then(unwrapMcpEnvelope),
       ])
       type User = { role: string; blocked: boolean }
       function summarizeUsers(users: User[]) {
