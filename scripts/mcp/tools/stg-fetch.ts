@@ -6,6 +6,9 @@ export const MCP_SECRET = process.env.MCP_SECRET ?? ''
 export function stgHeaders(): Record<string, string> {
   return {
     'Content-Type': 'application/json',
+    // MCP Streamable HTTP transport (POST /mcp) menolak request tanpa Accept ini
+    // dengan 406. Aman untuk endpoint REST lain (Accept tambahan diabaikan di sana).
+    Accept: 'application/json, text/event-stream',
     Authorization: `Bearer ${MCP_SECRET}`,
   }
 }
