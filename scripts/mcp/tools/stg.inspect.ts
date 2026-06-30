@@ -57,7 +57,7 @@ export function registerInspectTools(server: McpServer) {
     {
       title: 'STG: File health scan',
       description:
-        'Run file health scan on staging via /api/admin/file-health (SUPER_ADMIN cookie required, falls back to MCP bearer). Reports line/char counts vs limits in docs/FILE-HEALTH.md.',
+        'Run file health scan on staging via /api/admin/file-health (requires SUPER_ADMIN session cookie — this REST endpoint does NOT accept the MCP bearer, so this tool returns 401 from headless debug-stg). Reports line/char counts vs limits in docs/FILE-HEALTH.md.',
       inputSchema: z.object({}),
     },
     async () => stgResult(await stgFetch('/api/admin/file-health')),
@@ -94,7 +94,7 @@ export function registerInspectTools(server: McpServer) {
     {
       title: 'STG: WA sessions (enriched)',
       description:
-        'List all container sessions on staging enriched with status, masked phone, name, and orphan flag via GET /api/admin/wa-sessions (SUPER_ADMIN cookie, falls back to MCP bearer). Readonly.',
+        'List all container sessions on staging enriched with status, masked phone, name, and orphan flag via GET /api/admin/wa-sessions (requires SUPER_ADMIN session cookie — this REST endpoint does NOT accept the MCP bearer, so this tool returns 401 from headless debug-stg; use the /mcp tool wa_sessions_detail instead). Readonly.',
       inputSchema: z.object({}),
     },
     async () => stgResult(await stgFetch('/api/admin/wa-sessions')),
@@ -198,7 +198,7 @@ export function registerInspectTools(server: McpServer) {
     {
       title: 'STG: WA verify supervisor state',
       description:
-        'Get WAV capture poller state on staging (running, sessionId, watermark, masked server number) via GET /api/wa/verify/supervisor (SUPER_ADMIN cookie, falls back to MCP bearer). Readonly.',
+        'Get WAV capture poller state on staging (running, sessionId, watermark, masked server number) via GET /api/wa/verify/supervisor (requires ADMIN session cookie — this REST endpoint does NOT accept the MCP bearer, so this tool returns 401 from headless debug-stg; use the /mcp tool wa_verify_supervisor instead). Readonly.',
       inputSchema: z.object({}),
     },
     async () => stgResult(await stgFetch('/api/wa/verify/supervisor')),
