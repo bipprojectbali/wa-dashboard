@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+- **Startup migration crash loop di staging** — `src/lib/migrate.ts` kini memeriksa `DIRECT_URL` sebelum jatuh ke `DATABASE_URL`. Sebelumnya migrator pakai `DATABASE_URL` (PgBouncer) yang meng-inject parameter `pgbouncer=true`; PgBouncer menolak dengan `PostgresError: unsupported startup parameter: pgbouncer (08P01)`, menyebabkan crash loop tanpa batas. Dengan `DIRECT_URL` sebagai fallback kedua, migrator otomatis bypass PgBouncer (sama seperti `prisma.config.ts`).
+
 ## [0.1.4] - 2026-06-25
 
 ### Fixed

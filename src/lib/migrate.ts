@@ -133,7 +133,7 @@ async function connectWithRetry(url: string, retries: number): Promise<SQL> {
  * @throws if DB is unreachable after all retries, or if a migration SQL fails.
  */
 export async function runMigrations(options?: MigrateOptions): Promise<void> {
-  const url = options?.databaseUrl ?? process.env.MIGRATE_DATABASE_URL ?? process.env.DATABASE_URL
+  const url = options?.databaseUrl ?? process.env.MIGRATE_DATABASE_URL ?? process.env.DIRECT_URL ?? process.env.DATABASE_URL
 
   if (!url) {
     throw new Error('DATABASE_URL is not set — provide MIGRATE_DATABASE_URL or DATABASE_URL')
