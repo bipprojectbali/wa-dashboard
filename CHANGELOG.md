@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.9] - 2026-06-30
+
+### Fixed
+- **Verifikasi nomor (WAV) tidak pernah jalan di produksi/staging** — request verifikasi selalu PENDING walau `WA_VERIFY_SERVER_NUMBER` sudah diset. Penyebab: `startWaVerifySupervisor()` (plus `sweepWaVerify()` dan audit cleanup) hanya dipanggil di entry dev `src/index.tsx`, sedangkan produksi menjalankan binary dari `src/server.prod.ts` yang tidak pernah memanggilnya — supervisor capture poller tak pernah boot (`running:false`, `serverNumber:null`), token masuk tak tertangkap. Semua boot task kini diekstrak ke `src/lib/startup.ts` (`runStartupTasks()`) yang dipanggil **kedua** entry, plus test guard anti-drift. Wajib redeploy agar aktif.
+- **Tool MCP `debug-stg` rusak (protokol usang)** — seluruh tool inspeksi staging via `POST /mcp` membalas 400 "Invalid JSON-RPC message". Endpoint `/mcp` sudah memakai MCP Streamable HTTP standar (`tools/call`), tapi tool masih mengirim body lama `{tool, input}` dan tanpa header `Accept` (406). Ditambahkan helper `mcpCallBody`/`unwrapMcpEnvelope`/`stgMcpCall` di `scripts/mcp/tools/stg-fetch.ts`; 22 call-site dialihkan ke JSON-RPC standar + header `Accept` yang benar.
+
 ## [0.1.8] - 2026-06-30
 
 ### Fixed
