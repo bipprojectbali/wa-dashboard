@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { jsonText } from './shared'
-import { BASE_URL, stgFetch, stgResult } from './stg-fetch'
+import { BASE_URL, stgFetch, stgMcpCall, stgResult } from './stg-fetch'
 import { registerInspectDataTools } from './stg.inspect.data'
 
 export function registerInspectTools(server: McpServer) {
@@ -14,10 +14,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'health_full', input: {} }),
-        }),
+        await stgMcpCall('health_full', {}),
       ),
   )
 
@@ -75,10 +72,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'db_count_by_table', input: {} }),
-        }),
+        await stgMcpCall('db_count_by_table', {}),
       ),
   )
 
@@ -91,10 +85,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_sessions', input: {} }),
-        }),
+        await stgMcpCall('wa_sessions', {}),
       ),
   )
 
@@ -118,10 +109,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async ({ userId }) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_status', input: { userId } }),
-        }),
+        await stgMcpCall('wa_status', { userId }),
       ),
   )
 
@@ -137,10 +125,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async ({ userId, contactId }) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_avatar', input: { userId, contactId } }),
-        }),
+        await stgMcpCall('wa_avatar', { userId, contactId }),
       ),
   )
 
@@ -156,12 +141,7 @@ export function registerInspectTools(server: McpServer) {
       }),
     },
     async ({ userId, chatId, limit }) =>
-      stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_messages', input: limit ? { userId, chatId, limit } : { userId, chatId } }),
-        }),
-      ),
+      stgResult(await stgMcpCall('wa_messages', limit ? { userId, chatId, limit } : { userId, chatId })),
   )
 
   server.registerTool(
@@ -173,10 +153,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_policy_get', input: {} }),
-        }),
+        await stgMcpCall('wa_policy_get', {}),
       ),
   )
 
@@ -190,10 +167,7 @@ export function registerInspectTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_verify_consumers', input: {} }),
-        }),
+        await stgMcpCall('wa_verify_consumers', {}),
       ),
   )
 
@@ -205,12 +179,7 @@ export function registerInspectTools(server: McpServer) {
       inputSchema: z.object({ limit: z.number().int().min(1).max(200).optional().describe('Max rows (default 50)') }),
     },
     async ({ limit }) =>
-      stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_verify_requests', input: limit ? { limit } : {} }),
-        }),
-      ),
+      stgResult(await stgMcpCall('wa_verify_requests', limit ? { limit } : {})),
   )
 
   server.registerTool(
@@ -221,12 +190,7 @@ export function registerInspectTools(server: McpServer) {
       inputSchema: z.object({ limit: z.number().int().min(1).max(200).optional().describe('Max rows (default 50)') }),
     },
     async ({ limit }) =>
-      stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'wa_verify_inbound', input: limit ? { limit } : {} }),
-        }),
-      ),
+      stgResult(await stgMcpCall('wa_verify_inbound', limit ? { limit } : {})),
   )
 
   server.registerTool(

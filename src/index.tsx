@@ -173,30 +173,12 @@ async function serveFrontend(request: Request): Promise<Response> {
   return new Response('Not Found', { status: 404 })
 }
 
-// ─── Audit Log Rotation ───────────────────────────────
-import { prisma } from './lib/db'
+// ─── Startup Tasks (audit rotation, WAV supervisor, WAV sweep) ──────────
+// Sumber tunggal dibagi dengan entry produksi (src/server.prod.ts) agar boot
+// task tak pernah drift antar entry.
+import { runStartupTasks } from './lib/startup'
 
-async function cleanupAuditLogs() {
-  const cutoff = new Date(Date.now() - env.AUDIT_LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000)
-  const { count } = await prisma.auditLog.deleteMany({ where: { createdAt: { lt: cutoff } } })
-  if (count > 0) console.log(`[Audit] Cleaned up ${count} logs older than ${env.AUDIT_LOG_RETENTION_DAYS} days`)
-}
-
-// Run on startup, then every 24 hours
-cleanupAuditLogs().catch(console.error)
-setInterval(() => cleanupAuditLogs().catch(console.error), 24 * 60 * 60 * 1000)
-
-// ─── WhatsApp Inbound Verify (WAV) ────────────────────
-import { startWaVerifySupervisor } from './lib/wa-verify-poller'
-import { sweepWaVerify } from './lib/wa-verify-sweep'
-
-// Supervisor polling always-on (capture token verifikasi masuk via getChats).
-startWaVerifySupervisor()
-
-// Expiry + webhook retry + cleanup inbound log. Jalan saat boot, lalu tiap menit
-// (retry webhook butuh kadens lebih rapat dari audit cleanup).
-sweepWaVerify().catch(console.error)
-setInterval(() => sweepWaVerify().catch(console.error), 60 * 1000)
+runStartupTasks()
 
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'

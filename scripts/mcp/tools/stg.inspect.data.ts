@@ -1,6 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
-import { stgFetch, stgResult } from './stg-fetch'
+import { stgMcpCall, stgResult } from './stg-fetch'
 
 export function registerInspectDataTools(server: McpServer) {
   server.registerTool(
@@ -18,10 +18,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'logs_app', input }),
-        }),
+        await stgMcpCall('logs_app', input),
       ),
   )
 
@@ -39,10 +36,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'logs_audit', input }),
-        }),
+        await stgMcpCall('logs_audit', input),
       ),
   )
 
@@ -61,10 +55,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'db_list_users', input }),
-        }),
+        await stgMcpCall('db_list_users', input),
       ),
   )
 
@@ -80,10 +71,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'db_get_user', input }),
-        }),
+        await stgMcpCall('db_get_user', input),
       ),
   )
 
@@ -100,10 +88,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'db_list_sessions', input }),
-        }),
+        await stgMcpCall('db_list_sessions', input),
       ),
   )
 
@@ -116,10 +101,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'presence_online', input: {} }),
-        }),
+        await stgMcpCall('presence_online', {}),
       ),
   )
 
@@ -132,10 +114,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async () =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'redis_info', input: {} }),
-        }),
+        await stgMcpCall('redis_info', {}),
       ),
   )
 
@@ -148,10 +127,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'redis_get', input }),
-        }),
+        await stgMcpCall('redis_get', input),
       ),
   )
 
@@ -167,10 +143,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'redis_keys', input }),
-        }),
+        await stgMcpCall('redis_keys', input),
       ),
   )
 
@@ -189,10 +162,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'ticket_list', input }),
-        }),
+        await stgMcpCall('ticket_list', input),
       ),
   )
 
@@ -205,10 +175,7 @@ export function registerInspectDataTools(server: McpServer) {
     },
     async (input) =>
       stgResult(
-        await stgFetch('/mcp', {
-          method: 'POST',
-          body: JSON.stringify({ tool: 'ticket_get', input }),
-        }),
+        await stgMcpCall('ticket_get', input),
       ),
   )
 }
