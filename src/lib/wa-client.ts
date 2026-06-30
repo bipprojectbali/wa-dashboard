@@ -38,6 +38,7 @@ async function rawFetch(path: string, init?: RequestInit, jsonHeaders = true): P
   try {
     return await fetch(`${baseUrl()}${path}`, {
       ...init,
+      signal: AbortSignal.timeout(env.WA_API_TIMEOUT_MS),
       headers: {
         ...(jsonHeaders ? { 'Content-Type': 'application/json' } : {}),
         'x-api-key': env.WA_API_KEY,
@@ -45,8 +46,9 @@ async function rawFetch(path: string, init?: RequestInit, jsonHeaders = true): P
       },
     })
   } catch (e) {
-    // Network-level failure (DNS, TLS, container down) — fetch itself rejects.
-    throw new WaUpstreamError(`WA container unreachable at ${path}: ${e instanceof Error ? e.message : String(e)}`)
+    // Network-level failure (DNS, TLS, container down, timeout) — fetch itself rejects.
+    const reason = e instanceof Error ? e.message : String(e)
+    throw new WaUpstreamError(`WA container unreachable at ${path}: ${reason}`)
   }
 }
 

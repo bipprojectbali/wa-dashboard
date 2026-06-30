@@ -112,5 +112,6 @@ External REST container ([wwebjs-api](https://github.com/avoylenko/wwebjs-api)),
 |-----|---------|------------|
 | `WA_API_BASE_URL` | `''` (trailing slash dibuang) | Base URL container, mis. `https://wa-api.wibudev.com` |
 | `WA_API_KEY` | `''` | Disuntik sebagai header `x-api-key` — jangan commit nilainya, jangan kirim ke browser |
+| `WA_API_TIMEOUT_MS` | `15000` | Timeout (ms) setiap request ke container. Timeout → `WaUpstreamError` 502, bukan hang. |
 
 `sessionId` di container = dashboard `user.id` (1 sesi WhatsApp per user). WS relay via `src/lib/wa-bridge.ts` (butuh `ENABLE_WEBSOCKET=true` di container; fallback polling bila tidak aktif).

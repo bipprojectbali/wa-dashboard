@@ -3,9 +3,10 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [0.1.8] - 2026-06-30
 
 ### Fixed
+- **WA container request hang selamanya** — `rawFetch` di `src/lib/wa-client.ts` kini menyertakan `AbortSignal.timeout(WA_API_TIMEOUT_MS)` (default 15s). Sebelumnya tidak ada timeout: jika container lambat/down, semua pemanggil (`/api/admin/wa-sessions`, poller `reconcile()`, `pollOnce()`, dll) hang tanpa batas — panel WA Sessions hanya menampilkan "Loading..." selamanya dan WAV supervisor tidak pernah menemukan `sessionId` sehingga polling inbound tidak jalan. Setelah timeout, request gagal cepat dengan `WaUpstreamError` 502 (bukan hang), poller retry otomatis di siklus reconcile berikutnya. Env baru `WA_API_TIMEOUT_MS` (opsional, default `15000`).
 - **Startup migration crash loop di staging** — `src/lib/migrate.ts` kini memeriksa `DIRECT_URL` sebelum jatuh ke `DATABASE_URL`. Sebelumnya migrator pakai `DATABASE_URL` (PgBouncer) yang meng-inject parameter `pgbouncer=true`; PgBouncer menolak dengan `PostgresError: unsupported startup parameter: pgbouncer (08P01)`, menyebabkan crash loop tanpa batas. Dengan `DIRECT_URL` sebagai fallback kedua, migrator otomatis bypass PgBouncer (sama seperti `prisma.config.ts`).
 
 ## [0.1.4] - 2026-06-25
