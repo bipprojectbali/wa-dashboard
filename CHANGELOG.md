@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.16] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` menyimpan digit LID saat `getContactById` tidak mengembalikan `number`** — ditambahkan fallback ke `getContacts` (list lengkap semua kontak): dicari entry dengan `id._serialized === contactId`. Jika ditemukan, `number` dari kontak dipakai sebagai `resolvedPhone` dan `lidResolved=true` (Fix 2 berlaku). Bila kedua cara gagal, dicatat warning `WA verify @lid unresolved` dan Fix 2 di-skip (nomor asli tidak diketahui).
+
 ## [0.1.15] - 2026-07-01
 
 ### Fixed

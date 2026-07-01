@@ -87,6 +87,33 @@ export interface InboundResult {
   requestId?: string
 }
 
+// Resolve @lid contactId → nomor HP asli (best-effort, best-of-two):
+// 1. getContactById — cepat, tapi kadang tidak mengembalikan `number` untuk @lid
+// 2. getContacts (full list) — lebih berat tapi lebih lengkap; filter by id._serialized
+// Kembalikan null bila kedua cara gagal → caller pakai digit LID sebagai fallback.
+type ContactEntry = { id?: { _serialized?: string }; number?: string }
+type ContactsResp = { success: boolean; result?: ContactEntry[] }
+async function resolvePhoneFromContactId(sessionId: string, contactId: string): Promise<string | null> {
+  try {
+    const c = await wa.getContactById(sessionId, contactId)
+    const num = c?.result?.number?.replace(/\D/g, '')
+    if (num) return num
+  } catch {
+    /* fallthrough to contacts list */
+  }
+
+  try {
+    const all = (await wa.getContacts(sessionId)) as ContactsResp
+    const found = (all?.result ?? []).find((c) => c?.id?._serialized === contactId)
+    const num = found?.number?.replace(/\D/g, '')
+    if (num) return num
+  } catch {
+    /* ignore */
+  }
+
+  return null
+}
+
 // Proses satu pesan masuk. sessionId = WA session id (= dashboard user id).
 // Idempoten: updateMany dengan guard status=PENDING memastikan satu pemenang race.
 export async function handleInbound(sessionId: string, message: InboundMessage): Promise<InboundResult> {
@@ -119,21 +146,17 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
     return { matched: false }
   }
 
-  // Fix 1: Resolve @lid → nomor HP asli (best-effort). Kontak @lid tidak punya nomor di chatId-nya;
-  // kita tanya container untuk mendapatkan field `number`. Fallback ke digit LID bila gagal.
+  // Fix 1: Resolve @lid → nomor HP asli (best-effort via resolvePhoneFromContactId).
+  // Fallback ke digit LID bila semua cara gagal.
   let resolvedPhone = phone
   let lidResolved = !from.endsWith('@lid') // @c.us sudah punya nomor asli; @lid perlu resolve
   if (from.endsWith('@lid')) {
-    try {
-      const contact = await wa.getContactById(sessionId, from)
-      if (contact?.result?.number) {
-        resolvedPhone = contact.result.number.replace(/\D/g, '')
-        lidResolved = true
-      } else {
-        appLog('warn', 'WA verify @lid unresolved (no number)', `from=${phone}`).catch(() => {})
-      }
-    } catch (e) {
-      appLog('warn', 'WA verify @lid resolve failed', e instanceof Error ? e.message : String(e)).catch(() => {})
+    const resolved = await resolvePhoneFromContactId(sessionId, from)
+    if (resolved) {
+      resolvedPhone = resolved
+      lidResolved = true
+    } else {
+      appLog('warn', 'WA verify @lid unresolved', `from=${phone}`).catch(() => {})
     }
   }
   const resolvedMasked = maskPhone(resolvedPhone)
