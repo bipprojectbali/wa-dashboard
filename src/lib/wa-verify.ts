@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { appLog } from './applog'
 import { prisma } from './db'
+import * as wa from './wa-client'
 
 // WhatsApp Inbound Verify (WAV) — matcher. Listener menyerahkan tiap pesan masuk
 // ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Matcher tetap
@@ -109,7 +110,7 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
   const now = new Date()
   const candidate = await prisma.verifyRequest.findFirst({
     where: { token, status: 'PENDING', expiresAt: { gt: now } },
-    select: { id: true, consumerId: true },
+    select: { id: true, consumerId: true, expectedPhone: true },
   })
 
   if (!candidate) {
@@ -118,22 +119,50 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
     return { matched: false }
   }
 
+  // Fix 1: Resolve @lid → nomor HP asli (best-effort). Kontak @lid tidak punya nomor di chatId-nya;
+  // kita tanya container untuk mendapatkan field `number`. Fallback ke digit LID bila gagal.
+  let resolvedPhone = phone
+  if (from.endsWith('@lid')) {
+    try {
+      const contact = await wa.getContactById(sessionId, from)
+      if (contact?.result?.number) resolvedPhone = contact.result.number.replace(/\D/g, '')
+    } catch {
+      // best-effort — tetap proses dengan digit LID bila container error
+    }
+  }
+  const resolvedMasked = maskPhone(resolvedPhone)
+
+  // Fix 2: Server-side enforcement — server bertanggung jawab atas keamanan, bukan mendelegasikan
+  // ke consumer. Bila expectedPhone diset, tolak match jika nomor pengirim tidak sesuai.
+  if (candidate.expectedPhone) {
+    const expected = normalizePhone(candidate.expectedPhone)
+    if (expected && resolvedPhone !== expected) {
+      appLog(
+        'warn',
+        'WA verify phone mismatch',
+        `request=${candidate.id} expected=${maskPhone(expected)} actual=${resolvedMasked}`,
+      ).catch(() => {})
+      await writeInboundLog(sessionId, resolvedMasked, token, false, candidate.consumerId)
+      return { matched: false }
+    }
+  }
+
   // Guard status=PENDING di updateMany → hanya satu pemenang walau pesan dobel.
   const res = await prisma.verifyRequest.updateMany({
     where: { id: candidate.id, status: 'PENDING', expiresAt: { gt: now } },
     data: {
       status: 'VERIFIED',
-      matchedPhone: phone,
+      matchedPhone: resolvedPhone,
       matchedMessageId: extractMessageId(message.id),
       verifiedAt: now,
     },
   })
 
   const won = res.count === 1
-  await writeInboundLog(sessionId, masked, token, won, candidate.consumerId)
+  await writeInboundLog(sessionId, resolvedMasked, token, won, candidate.consumerId)
 
   if (won) {
-    appLog('info', 'WA verify matched', `consumer=${candidate.consumerId} from=${masked}`).catch(() => {})
+    appLog('info', 'WA verify matched', `consumer=${candidate.consumerId} from=${resolvedMasked}`).catch(() => {})
     // Picu webhook async (best-effort). Dynamic import memutus circular dependency
     // dengan listener/boot dan menjaga matcher tetap murni.
     import('./wa-verify-webhook')

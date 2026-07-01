@@ -113,3 +113,11 @@ export const fetchChatMessages = (id: string, chatId: string, limit: number) =>
     method: 'POST',
     body: JSON.stringify({ chatId, searchOptions: { limit } }),
   })
+
+// Resolve contactId (@lid, @c.us, digit) → full contact object including real phone number.
+// Dipakai matcher WAV untuk mengubah identifier @lid menjadi nomor HP asli sebelum disimpan.
+export const getContactById = (id: string, contactId: string) =>
+  waFetch<{ success: boolean; result?: { number?: string; id?: { _serialized?: string }; pushname?: string } }>(
+    `/client/getContactById/${id}`,
+    { method: 'POST', body: JSON.stringify({ contactId }) },
+  )

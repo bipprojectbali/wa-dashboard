@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.14] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` menyimpan digit LID untuk kontak @lid** — kontak modern WhatsApp diidentifikasi dengan format `@lid` (Linked Device ID), bukan nomor HP. Server kini memanggil `getContactById` di container untuk mendapatkan nomor HP asli, sehingga `matchedPhone` di `VerifyRequest` selalu berisi nomor HP yang bisa dibaca. Fallback ke digit LID bila container error (best-effort).
+- **Keamanan server-side `expectedPhone`** — sebelumnya server menandai VERIFIED meskipun nomor pengirim berbeda dari `expectedPhone`, dan mendelegasikan validasinya ke consumer. Kini server yang bertanggung jawab: bila `expectedPhone` diset, pencocokan ditolak (silent, `matched:false`) jika nomor pengirim tidak sesuai. Warning `WA verify phone mismatch` dicatat di app log dengan nomor ter-mask.
+
 ## [0.1.13] - 2026-07-01
 
 ### Fixed
