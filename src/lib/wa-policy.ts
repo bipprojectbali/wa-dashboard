@@ -16,6 +16,8 @@ export interface WaPolicyData {
   perRecipientCooldownSeconds: number
   requireAck: boolean
   contractVersion: number
+  verifyReplyEnabled: boolean
+  verifyReplyMessage: string | null
   updatedAt: Date
   updatedById: string | null
 }
@@ -134,12 +136,19 @@ async function bumpCounter(key: string, ttl: number): Promise<number> {
   return n
 }
 
+// Opsi gate. skipOutreachGates melewati aturan yang khusus untuk kirim-duluan manual
+// (wajib-ack & blokir-first-contact) — dipakai balasan otomatis WAV yang membalas pesan
+// inbound (bukan cold outreach), tapi tetap tunduk pada rate/cooldown/plafon (rule 3-6).
+export interface PolicyCheckOptions {
+  skipOutreachGates?: boolean
+}
+
 // Cek semua aturan (fail-fast), baru consume kuota bila lolos. Dipanggil dari route send.
-export async function checkAndConsume(userId: string, chatId: string): Promise<PolicyCheck> {
+export async function checkAndConsume(userId: string, chatId: string, opts?: PolicyCheckOptions): Promise<PolicyCheck> {
   const policy = await getPolicy()
 
-  // 1. Ack gate
-  if (policy.requireAck) {
+  // 1. Ack gate — khusus kirim-duluan manual; dilewati untuk balasan inbound (skipOutreachGates).
+  if (!opts?.skipOutreachGates && policy.requireAck) {
     const ack = await getAck(userId)
     if (!ack || ack.version < policy.contractVersion) {
       return {
@@ -150,8 +159,8 @@ export async function checkAndConsume(userId: string, chatId: string): Promise<P
     }
   }
 
-  // 2. First-contact rule
-  if (!policy.allowFirstContact) {
+  // 2. First-contact rule — idem: balasan inbound berarti user sudah kontak duluan.
+  if (!opts?.skipOutreachGates && !policy.allowFirstContact) {
     const known = await getKnownRecipients(userId)
     if (!known.has(chatId)) {
       return {

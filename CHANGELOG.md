@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.11] - 2026-07-01
+
+### Added
+- **Balasan otomatis WhatsApp saat verifikasi (WAV) berhasil** — nomor server dapat membalas user dengan pesan "berhasil" saat verifikasi sukses (aman: reply-to-inbound, bukan cold outreach). **Default MATI** (`WaPolicy.verifyReplyEnabled=false`) agar nomor server tetap receive-only sampai sengaja dinyalakan di `/wa?tab=policy` (SUPER_ADMIN). Teks bisa diedit kapanpun (`verifyReplyMessage`) dengan **default yang bisa dikembalikan** (kosong/null → varian default di kode, dipilih deterministik per-request agar tak seragam identik). Balasan dipicu best-effort dari `handleInbound` via `sendVerifyReply()` (`src/lib/wa-verify-reply.ts`): **idempoten** (`VerifyRequest.replySentAt` claim-then-send, cegah dobel dari poller re-run), tergate **rate-only** (`checkAndConsume(..., { skipOutreachGates: true })` — lewati ack & first-contact yang khusus kirim-duluan, tetap tunduk min-interval/cooldown/plafon; plafon tercapai → balasan di-skip diam, verifikasi tetap sukses), audit `WA_VERIFY_REPLY_SENT`. Zero PII (teks tak menyisipkan nomor/token). Field baru `WaPolicy.verifyReplyEnabled`/`verifyReplyMessage` + `VerifyRequest.replySentAt`.
+
 ## [0.1.10] - 2026-07-01
 
 ### Changed

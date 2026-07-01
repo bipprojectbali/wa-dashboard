@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:test'
 import { env } from '../../src/lib/env'
 import { redis } from '../../src/lib/redis'
-import { invalidatePolicyCache } from '../../src/lib/wa-policy'
+import { checkAndConsume, invalidatePolicyCache } from '../../src/lib/wa-policy'
 import { createTestApp, createTestSession, prisma, seedTestUser } from '../helpers'
 
 const app = createTestApp()
@@ -129,6 +129,7 @@ describe('PUT /api/wa/policy', () => {
     minIntervalSeconds: 10,
     perRecipientCooldownSeconds: 90,
     requireAck: true,
+    verifyReplyEnabled: false,
   }
 
   test('returns 403 for ADMIN (not SUPER_ADMIN)', async () => {
@@ -273,5 +274,41 @@ describe('POST /api/wa/send — enforcement', () => {
     expect(first.status).toBe(200)
     const second = await sendReq(adminCookie, { chatId: '628555@c.us', content: 'two' })
     expect(second.status).toBe(429)
+  })
+})
+
+// Gate untuk balasan WAV: skipOutreachGates melewati ack & first-contact (balasan inbound,
+// bukan kirim-duluan), tapi rate/cooldown/plafon tetap ditegakkan.
+describe('checkAndConsume — skipOutreachGates (balasan WAV)', () => {
+  beforeEach(async () => {
+    await clearRl(adminId)
+  })
+
+  test('ok walau requireAck=true & belum ack (ack di-skip)', async () => {
+    await setPolicy({ allowFirstContact: false, requireAck: true })
+    const res = await checkAndConsume(adminId, '628321@c.us', { skipOutreachGates: true })
+    expect(res.ok).toBe(true)
+  })
+
+  test('ok walau first-contact ke nomor tak dikenal (first-contact di-skip)', async () => {
+    await setPolicy({ allowFirstContact: false, requireAck: false })
+    const res = await checkAndConsume(adminId, '628654@c.us', { skipOutreachGates: true })
+    expect(res.ok).toBe(true)
+  })
+
+  test('tanpa skip: nomor tak dikenal tetap 403 first-contact (kontrol)', async () => {
+    await setPolicy({ allowFirstContact: false, requireAck: false })
+    const res = await checkAndConsume(adminId, '628654@c.us')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.status).toBe(403)
+  })
+
+  test('plafon per-menit tetap ditegakkan walau skipOutreachGates', async () => {
+    await setPolicy({ allowFirstContact: false, requireAck: true, maxPerMinute: 1 })
+    const first = await checkAndConsume(adminId, '628999@c.us', { skipOutreachGates: true })
+    expect(first.ok).toBe(true)
+    const second = await checkAndConsume(adminId, '628999@c.us', { skipOutreachGates: true })
+    expect(second.ok).toBe(false)
+    if (!second.ok) expect(second.status).toBe(429)
   })
 })

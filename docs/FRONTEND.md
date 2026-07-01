@@ -61,7 +61,7 @@ Tab `?tab=policy` di `/wa` ("Aturan & Kontrak", icon `TbShieldLock`):
 - `WaPolicyPanel.tsx` — orchestrator, query `['wa','policy']` GET `/api/wa/policy`. Banner oranye saat `allowFirstContact=true` (mode OTP aktif).
 - `WaContractView.tsx` — render teks kontrak + tombol "Saya setuju & paham risikonya" → POST `/api/wa/policy/ack`. Saat sudah disetujui, muncul tombol "Batalkan persetujuan" (modal konfirmasi) → DELETE `/api/wa/policy/ack`.
 - `WaPolicyUsage.tsx` — progress bar kuota menit/jam/hari.
-- `WaPolicySettings.tsx` — form editable (SUPER_ADMIN saja, `canEdit`) → PUT `/api/wa/policy`.
+- `WaPolicySettings.tsx` — form editable (SUPER_ADMIN saja, `canEdit`) → PUT `/api/wa/policy`. Termasuk kartu "Balas otomatis saat verifikasi berhasil": `Switch` (`verifyReplyEnabled`) + `Textarea` teks balasan (`verifyReplyMessage`, placeholder = teks default, disabled saat switch off) + tombol "Kembalikan ke default" (set message → `null`). Textarea kosong dikirim sebagai `null` (server pakai default).
 - `wa-policy.types.ts` — tipe `WaPolicy`, `UsageSnapshot`, `PolicyResponse`, `PolicyEditable`.
 
 Tab `?tab=account` ("Info Akun"):

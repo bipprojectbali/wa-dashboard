@@ -3,8 +3,9 @@ import { appLog } from './applog'
 import { prisma } from './db'
 
 // WhatsApp Inbound Verify (WAV) — matcher. Listener menyerahkan tiap pesan masuk
-// ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Capture-only:
-// TIDAK PERNAH membalas ke user (anti-ban) dan TIDAK menyentuh wa-policy (gate outbound).
+// ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Matcher tetap
+// murni (tak menyentuh wa-policy langsung); balasan opsional saat match dipicu best-effort
+// via modul terpisah `wa-verify-reply` (default MATI, tergate rate anti-ban, idempoten).
 
 // Alfabet base32 tanpa karakter ambigu (tanpa 0/1/8/9, O/I/L/B). Token = WAV- + 8 char.
 const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ234567'
@@ -138,6 +139,11 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
     import('./wa-verify-webhook')
       .then((m) => m.deliverVerified(candidate.id))
       .catch((e) => appLog('warn', 'WA verify webhook dispatch failed', String(e)).catch(() => {}))
+    // Balasan otomatis ke user (best-effort, default MATI). Dynamic import menjaga matcher
+    // murni & memutus circular dependency. phone = nomor pengirim mentah yang cocok.
+    import('./wa-verify-reply')
+      .then((m) => m.sendVerifyReply(candidate.id, sessionId, phone))
+      .catch((e) => appLog('warn', 'WA verify reply dispatch failed', String(e)).catch(() => {}))
   }
 
   return { matched: won, consumerId: candidate.consumerId, requestId: candidate.id }

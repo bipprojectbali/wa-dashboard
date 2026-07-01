@@ -1,4 +1,4 @@
-# wa-dashboard (v0.1.9)
+# wa-dashboard (v0.1.10)
 
 > Full-stack web application template built with Bun, Elysia, React 19, and Vite.
 
@@ -99,9 +99,9 @@ CHANGELOG.md, and the docs/ folder. Edit those sources instead.
 - **Ticket** (table `ticket`): id, title, description, status, priority, route, reporterId, assigneeId, createdAt, updatedAt, closedAt, deletedAt, reporter, assignee, comments, evidence
 - **TicketComment** (table `ticket_comment`): id, ticketId, authorId, authorTag, body, createdAt, ticket, author
 - **TicketEvidence** (table `ticket_evidence`): id, ticketId, kind, url, note, createdAt, ticket
-- **WaPolicy** (table `wa_policy`): id, allowFirstContact, maxPerMinute, maxPerHour, maxPerDay, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, updatedAt, updatedById
+- **WaPolicy** (table `wa_policy`): id, allowFirstContact, maxPerMinute, maxPerHour, maxPerDay, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, verifyReplyEnabled, verifyReplyMessage, updatedAt, updatedById
 - **VerifyConsumer** (table `verify_consumer`): id, name, apiKeyHash, apiKeyPrefix, webhookUrl, webhookSecret, active, createdById, createdAt, updatedAt, requests
-- **VerifyRequest** (table `verify_request`): id, consumerId, token, expectedPhone, status, matchedPhone, matchedMessageId, expiresAt, verifiedAt, deliveryStatus, deliveryAttempts, lastDeliveryAt, lastDeliveryError, createdAt, consumer
+- **VerifyRequest** (table `verify_request`): id, consumerId, token, expectedPhone, status, matchedPhone, matchedMessageId, expiresAt, verifiedAt, deliveryStatus, deliveryAttempts, lastDeliveryAt, lastDeliveryError, replySentAt, createdAt, consumer
 - **VerifyInboundLog** (table `verify_inbound_log`): id, sessionId, fromMasked, tokenFound, matched, consumerId, createdAt
 
 ## Environment Variables
@@ -120,13 +120,12 @@ CHANGELOG.md, and the docs/ folder. Edit those sources instead.
 
 ## Recent Changes
 
+### 0.1.11 — 2026-07-01
+- Added: **Balasan otomatis WhatsApp saat verifikasi (WAV) berhasil** — nomor server dapat membalas user dengan pesan "berhasil" saat verifikasi sukses (aman: reply-to-inbound, bukan cold outreach). **Default MATI** (`WaPolicy.verifyReplyEnabled=false`) agar nomor server tetap receive-only sampai sengaja dinyalakan di `/wa?tab=policy` (SUPER_ADMIN). Teks bisa diedit kapanpun (`verifyReplyMessage`) dengan **default yang bisa dikembalikan** (kosong/null → varian default di kode, dipilih deterministik per-request agar tak seragam identik). Balasan dipicu best-effort dari `handleInbound` via `sendVerifyReply()` (`src/lib/wa-verify-reply.ts`): **idempoten** (`VerifyRequest.replySentAt` claim-then-send, cegah dobel dari poller re-run), tergate **rate-only** (`checkAndConsume(..., { skipOutreachGates: true })` — lewati ack & first-contact yang khusus kirim-duluan, tetap tunduk min-interval/cooldown/plafon; plafon tercapai → balasan di-skip diam, verifikasi tetap sukses), audit `WA_VERIFY_REPLY_SENT`. Zero PII (teks tak menyisipkan nomor/token). Field baru `WaPolicy.verifyReplyEnabled`/`verifyReplyMessage` + `VerifyRequest.replySentAt`.
+
 ### 0.1.10 — 2026-07-01
 - Changed: **Konsolidasi navigasi WhatsApp ke satu menu `/wa`** — panel operator **WA Sessions** dan **Simulasi Login WAV** yang sebelumnya tersebar (tab `/dev?tab=wa-sessions` dan route standalone `/simulation`) kini menjadi tab di dalam `/wa` (`?tab=sessions` & `?tab=simulation`), khusus SUPER_ADMIN di bawah divider "Operator". Sidebar `/dev` menyisakan satu link "WhatsApp" sebagai entry-point tunggal. Route `/simulation` dihapus (komponen `SimLoginPanel` dipakai ulang sebagai tab). Tak ada perubahan endpoint/backend — semua REST WAV (`/api/wa/verify/sim/*`, `/api/admin/wa-sessions`) tetap sama.
 
 ### 0.1.9 — 2026-06-30
 - Fixed: **Verifikasi nomor (WAV) tidak pernah jalan di produksi/staging** — request verifikasi selalu PENDING walau `WA_VERIFY_SERVER_NUMBER` sudah diset. Penyebab: `startWaVerifySupervisor()` (plus `sweepWaVerify()` dan audit cleanup) hanya dipanggil di entry dev `src/index.tsx`, sedangkan produksi menjalankan binary dari `src/server.prod.ts` yang tidak pernah memanggilnya — supervisor capture poller tak pernah boot (`running:false`, `serverNumber:null`), token masuk tak tertangkap. Semua boot task kini diekstrak ke `src/lib/startup.ts` (`runStartupTasks()`) yang dipanggil **kedua** entry, plus test guard anti-drift. Wajib redeploy agar aktif.
 - Fixed: **Tool MCP `debug-stg` rusak (protokol usang)** — seluruh tool inspeksi staging via `POST /mcp` membalas 400 "Invalid JSON-RPC message". Endpoint `/mcp` sudah memakai MCP Streamable HTTP standar (`tools/call`), tapi tool masih mengirim body lama `{tool, input}` dan tanpa header `Accept` (406). Ditambahkan helper `mcpCallBody`/`unwrapMcpEnvelope`/`stgMcpCall` di `scripts/mcp/tools/stg-fetch.ts`; 22 call-site dialihkan ke JSON-RPC standar + header `Accept` yang benar.
-
-### 0.1.8 — 2026-06-30
-- Fixed: **WA container request hang selamanya** — `rawFetch` di `src/lib/wa-client.ts` kini menyertakan `AbortSignal.timeout(WA_API_TIMEOUT_MS)` (default 15s). Sebelumnya tidak ada timeout: jika container lambat/down, semua pemanggil (`/api/admin/wa-sessions`, poller `reconcile()`, `pollOnce()`, dll) hang tanpa batas — panel WA Sessions hanya menampilkan "Loading..." selamanya dan WAV supervisor tidak pernah menemukan `sessionId` sehingga polling inbound tidak jalan. Setelah timeout, request gagal cepat dengan `WaUpstreamError` 502 (bukan hang), poller retry otomatis di siklus reconcile berikutnya. Env baru `WA_API_TIMEOUT_MS` (opsional, default `15000`).
-- Fixed: **Startup migration crash loop di staging** — `src/lib/migrate.ts` kini memeriksa `DIRECT_URL` sebelum jatuh ke `DATABASE_URL`. Sebelumnya migrator pakai `DATABASE_URL` (PgBouncer) yang meng-inject parameter `pgbouncer=true`; PgBouncer menolak dengan `PostgresError: unsupported startup parameter: pgbouncer (08P01)`, menyebabkan crash loop tanpa batas. Dengan `DIRECT_URL` sebagai fallback kedua, migrator otomatis bypass PgBouncer (sama seperti `prisma.config.ts`).
