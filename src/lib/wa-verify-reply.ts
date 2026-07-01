@@ -37,11 +37,12 @@ export function buildReplyMessage(custom: string | null | undefined, seed: strin
 }
 
 // Kirim balasan best-effort. Semua kegagalan ditelan dengan log — verifikasi tak boleh
-// terpengaruh. sessionId = WA session id nomor server; phone = matchedPhone (digit mentah).
-export async function sendVerifyReply(requestId: string, sessionId: string, phone: string): Promise<void> {
+// terpengaruh. sessionId = WA session id nomor server; chatId = from asli pesan masuk
+// (sudah termasuk sufiks @c.us/@lid — jangan rekonstruksi, sufiks salah → No LID error).
+export async function sendVerifyReply(requestId: string, sessionId: string, chatId: string): Promise<void> {
   const policy = await getPolicy()
   if (!policy.verifyReplyEnabled) return
-  if (!phone) return
+  if (!chatId) return
 
   // Idempotency claim: hanya satu pemenang yang set replySentAt (guard status VERIFIED &
   // replySentAt masih null). Poller yang re-run atau match dobel → count 0 → berhenti.
@@ -53,15 +54,15 @@ export async function sendVerifyReply(requestId: string, sessionId: string, phon
     .catch(() => ({ count: 0 }))
   if (claim.count !== 1) return
 
-  // Rekonstruksi chatId dari nomor mentah. Pakai @c.us (personal) — hindari @lid yang tak
-  // selalu bisa dibalas.
-  const chatId = `${phone}@c.us`
-
   // Gate rate-only: min-interval, cooldown per-nomor, plafon volume tetap ditegakkan; aturan
   // wajib-ack & first-contact dilewati (balasan inbound, bukan kirim-duluan).
   const gate = await checkAndConsume(sessionId, chatId, { skipOutreachGates: true })
   if (!gate.ok) {
-    appLog('info', 'WA verify reply skipped (rate)', `request=${requestId} status=${gate.status}`).catch(() => {})
+    appLog(
+      'info',
+      'WA verify reply skipped (rate)',
+      `request=${requestId} chatId=${chatId} status=${gate.status}`,
+    ).catch(() => {})
     return
   }
 

@@ -140,9 +140,9 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
       .then((m) => m.deliverVerified(candidate.id))
       .catch((e) => appLog('warn', 'WA verify webhook dispatch failed', String(e)).catch(() => {}))
     // Balasan otomatis ke user (best-effort, default MATI). Dynamic import menjaga matcher
-    // murni & memutus circular dependency. phone = nomor pengirim mentah yang cocok.
+    // murni & memutus circular dependency. from = chatId asli (@c.us/@lid) dari pesan masuk.
     import('./wa-verify-reply')
-      .then((m) => m.sendVerifyReply(candidate.id, sessionId, phone))
+      .then((m) => m.sendVerifyReply(candidate.id, sessionId, from))
       .catch((e) => appLog('warn', 'WA verify reply dispatch failed', String(e)).catch(() => {}))
   }
 
