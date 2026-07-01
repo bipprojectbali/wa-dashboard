@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.17] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` masih berisi digit LID meski fallback `getContacts` sudah ditambah** — `getContacts` pun tidak menemukan nomor untuk kontak @lid karena format `id._serialized` yang dicocokkan tidak match. Solusi definitif: poller (`wa-verify-poller.ts`) kini meneruskan `chat.contact.number` dari respons `getChats` sebagai field `contactNumber` di `NewInbound`. `handleInbound` memakai ini sebagai sumber pertama (tanpa API call tambahan) sebelum mencoba `getContactById` → `getContacts` sebagai fallback berlapis. Chat object dari wwebjs-api menyertakan `contact.number` dengan nomor HP asli bahkan untuk kontak @lid.
+
 ## [0.1.16] - 2026-07-01
 
 ### Fixed

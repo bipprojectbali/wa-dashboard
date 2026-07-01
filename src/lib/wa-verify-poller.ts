@@ -41,11 +41,15 @@ interface RawChat {
   // Container memberi `lastMessage.timestamp` (epoch detik); `t` hanya di payload
   // mentah `_data` → fallback. Membaca `t` saja membuat watermark tak pernah maju.
   lastMessage?: { from?: string; body?: string; fromMe?: boolean; timestamp?: number; t?: number }
+  // contact.number memberi nomor HP asli bahkan untuk kontak @lid — diteruskan ke
+  // handleInbound agar @lid resolution tidak butuh API call tambahan.
+  contact?: { number?: string }
 }
 export interface NewInbound {
   from: string
   body: string
   fromMe: boolean
+  contactNumber?: string // dari chat.contact.number — nomor HP asli untuk kontak @lid
 }
 
 // Fungsi PURE (mudah di-unit-test tanpa container). Untuk tiap chat ambil
@@ -61,7 +65,8 @@ export function filterNewInbound(chats: RawChat[], watermarkMs: number): { messa
     const tMs = ts * 1000
     if (tMs > maxTMs) maxTMs = tMs
     if (lm.fromMe === false && tMs > watermarkMs) {
-      messages.push({ from: lm.from ?? '', body: lm.body ?? '', fromMe: false })
+      const contactNumber = chat.contact?.number?.replace(/\D/g, '') || undefined
+      messages.push({ from: lm.from ?? '', body: lm.body ?? '', fromMe: false, contactNumber })
     }
   }
   return { messages, maxTMs }

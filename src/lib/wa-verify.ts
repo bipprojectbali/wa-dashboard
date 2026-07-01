@@ -69,6 +69,7 @@ interface InboundMessage {
   body?: string
   fromMe?: boolean
   id?: unknown
+  contactNumber?: string // nomor HP asli dari chat.contact.number (diteruskan poller)
 }
 
 // id container bisa string atau objek { _serialized }. Ambil bentuk string aman.
@@ -146,17 +147,26 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
     return { matched: false }
   }
 
-  // Fix 1: Resolve @lid → nomor HP asli (best-effort via resolvePhoneFromContactId).
-  // Fallback ke digit LID bila semua cara gagal.
+  // Fix 1: Resolve @lid → nomor HP asli. Tiga sumber secara berurutan (stop di yang pertama berhasil):
+  // 1. chat.contact.number dari poller (tanpa API call tambahan) — paling efisien
+  // 2. getContactById container — cepat tapi kadang tidak punya `number`
+  // 3. getContacts full list — lebih berat, filter by id._serialized
+  // Fallback ke digit LID bila semua gagal.
   let resolvedPhone = phone
   let lidResolved = !from.endsWith('@lid') // @c.us sudah punya nomor asli; @lid perlu resolve
   if (from.endsWith('@lid')) {
-    const resolved = await resolvePhoneFromContactId(sessionId, from)
-    if (resolved) {
-      resolvedPhone = resolved
+    const fromChat = message.contactNumber
+    if (fromChat) {
+      resolvedPhone = fromChat
       lidResolved = true
     } else {
-      appLog('warn', 'WA verify @lid unresolved', `from=${phone}`).catch(() => {})
+      const resolved = await resolvePhoneFromContactId(sessionId, from)
+      if (resolved) {
+        resolvedPhone = resolved
+        lidResolved = true
+      } else {
+        appLog('warn', 'WA verify @lid unresolved', `from=${phone}`).catch(() => {})
+      }
     }
   }
   const resolvedMasked = maskPhone(resolvedPhone)
