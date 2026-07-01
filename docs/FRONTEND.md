@@ -118,8 +118,11 @@ Badge ringkasan total/connected/orphan. Baris milik operator yang sedang login (
 `useSession().data.user.id`) ditandai highlight biru + badge "Sesi Anda". Component:
 `src/frontend/components/dev/WaSessionsPanel.tsx`.
 
-Sidebar `/dev` punya NavLink "Simulation" (icon `TbLogin2`, grup "Apps") → `navigate({ to:
-'/simulation', search: { tab: 'login' } })`.
+Sidebar `/dev` mengelompokkan navigasi terkait WhatsApp di bawah divider **"WhatsApp"**
+(terpisah dari grup "Apps"): **WA Sessions** (tab internal `?tab=wa-sessions` via
+`setActive`, bukan navItems lagi), **WhatsApp** (`navigate` → `/wa?tab=connection`, icon
+`TbBrandWhatsapp`), dan **Simulation** (`navigate` → `/simulation?tab=login`, icon
+`TbLogin2`).
 
 ### Halaman Simulasi Login (`/simulation`, `src/frontend/components/sim/`)
 

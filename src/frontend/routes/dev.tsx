@@ -7,6 +7,7 @@ import {
   Group,
   Menu,
   NavLink,
+  ScrollArea,
   Stack,
   Text,
   ThemeIcon,
@@ -111,7 +112,6 @@ const navItems = [
   { label: 'Project', icon: TbSitemap, key: 'project' },
   { label: 'File Health', icon: TbRuler2, key: 'file-health' },
   { label: 'API Docs', icon: TbApi, key: 'api-docs' },
-  { label: 'WA Sessions', icon: TbBrandWhatsapp, key: 'wa-sessions' },
   { label: 'Settings', icon: TbSettings, key: 'settings' },
 ]
 
@@ -202,7 +202,7 @@ function DevPage() {
           </Group>
         </AppShell.Section>
 
-        <AppShell.Section grow>
+        <AppShell.Section grow component={ScrollArea} type="scroll">
           {navItems.map((item) =>
             collapsed ? (
               <Tooltip key={item.key} label={item.label} position="right">
@@ -252,55 +252,6 @@ function DevPage() {
               leftSection={<TbLayoutDashboard size={18} />}
               rightSection={<TbChevronRight size={14} />}
               onClick={() => navigate({ to: '/dashboard', search: { tab: 'dashboard' } })}
-              variant="light"
-              mb={4}
-            />
-          )}
-
-          {collapsed ? (
-            <Tooltip label="WhatsApp" position="right">
-              <ActionIcon
-                variant="subtle"
-                color="green"
-                size="lg"
-                mb={4}
-                style={{ width: '100%' }}
-                onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
-              >
-                <TbBrandWhatsapp size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <NavLink
-              label="WhatsApp"
-              leftSection={<TbBrandWhatsapp size={18} />}
-              rightSection={<TbChevronRight size={14} />}
-              onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
-              variant="light"
-              mb={4}
-            />
-          )}
-
-          {collapsed ? (
-            <Tooltip label="Simulation" position="right">
-              <ActionIcon
-                variant="subtle"
-                color="violet"
-                size="lg"
-                mb={4}
-                style={{ width: '100%' }}
-                onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
-              >
-                <TbLogin2 size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <NavLink
-              label="Simulation"
-              description="Uji alur WAV end-to-end"
-              leftSection={<TbLogin2 size={18} />}
-              rightSection={<TbChevronRight size={14} />}
-              onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
               variant="light"
               mb={4}
             />
@@ -358,6 +309,82 @@ function DevPage() {
               href="/llms.txt"
               target="_blank"
               rel="noopener noreferrer"
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? <Divider my={6} /> : <Divider my={6} label="WhatsApp" labelPosition="left" />}
+
+          {collapsed ? (
+            <Tooltip label="WA Sessions" position="right">
+              <ActionIcon
+                variant={active === 'wa-sessions' ? 'light' : 'subtle'}
+                color={active === 'wa-sessions' ? 'blue' : 'gray'}
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                onClick={() => setActive('wa-sessions')}
+              >
+                <TbBrandWhatsapp size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="WA Sessions"
+              leftSection={<TbBrandWhatsapp size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              active={active === 'wa-sessions'}
+              onClick={() => setActive('wa-sessions')}
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? (
+            <Tooltip label="WhatsApp" position="right">
+              <ActionIcon
+                variant="subtle"
+                color="green"
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
+              >
+                <TbBrandWhatsapp size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="WhatsApp"
+              leftSection={<TbBrandWhatsapp size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
+              variant="light"
+              mb={4}
+            />
+          )}
+
+          {collapsed ? (
+            <Tooltip label="Simulation" position="right">
+              <ActionIcon
+                variant="subtle"
+                color="violet"
+                size="lg"
+                mb={4}
+                style={{ width: '100%' }}
+                onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
+              >
+                <TbLogin2 size={18} />
+              </ActionIcon>
+            </Tooltip>
+          ) : (
+            <NavLink
+              label="Simulation"
+              description="Uji alur WAV end-to-end"
+              leftSection={<TbLogin2 size={18} />}
+              rightSection={<TbChevronRight size={14} />}
+              onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
               variant="light"
               mb={4}
             />
