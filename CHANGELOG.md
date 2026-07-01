@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.13] - 2026-07-01
+
+### Fixed
+- **Balasan otomatis WAV gagal untuk kontak @lid** — rekonstruksi `phone@c.us` gagal karena WhatsApp kini mengidentifikasi sebagian kontak dengan format LID (`@lid`). Fix: pass `from` asli dari pesan masuk (sudah berisi sufiks `@c.us`/`@lid`) langsung ke `sendVerifyReply`, tanpa rekonstruksi.
+
 ## [0.1.12] - 2026-07-01
 
 ### Added
