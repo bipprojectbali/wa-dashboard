@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.15] - 2026-07-01
+
+### Fixed
+- **Verifikasi @lid selalu gagal saat `expectedPhone` diset** — `getContactById` container kemungkinan tidak tersedia; error sebelumnya ditelan diam sehingga `resolvedPhone` tetap berisi digit LID, lalu Fix 2 menolak karena LID ≠ nomor HP. Sekarang: error `getContactById` dicatat di app log (`WA verify @lid resolve failed` / `unresolved`); bila @lid gagal di-resolve, pengecekan `expectedPhone` di-skip (nomor asli tidak diketahui, tidak bisa dibandingkan). Verifikasi tetap lolos; konsekuensi: `matchedPhone` menyimpan digit LID bukan nomor HP untuk kontak jenis ini.
+
 ## [0.1.14] - 2026-07-01
 
 ### Fixed

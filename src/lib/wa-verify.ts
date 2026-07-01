@@ -122,19 +122,26 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
   // Fix 1: Resolve @lid → nomor HP asli (best-effort). Kontak @lid tidak punya nomor di chatId-nya;
   // kita tanya container untuk mendapatkan field `number`. Fallback ke digit LID bila gagal.
   let resolvedPhone = phone
+  let lidResolved = !from.endsWith('@lid') // @c.us sudah punya nomor asli; @lid perlu resolve
   if (from.endsWith('@lid')) {
     try {
       const contact = await wa.getContactById(sessionId, from)
-      if (contact?.result?.number) resolvedPhone = contact.result.number.replace(/\D/g, '')
-    } catch {
-      // best-effort — tetap proses dengan digit LID bila container error
+      if (contact?.result?.number) {
+        resolvedPhone = contact.result.number.replace(/\D/g, '')
+        lidResolved = true
+      } else {
+        appLog('warn', 'WA verify @lid unresolved (no number)', `from=${phone}`).catch(() => {})
+      }
+    } catch (e) {
+      appLog('warn', 'WA verify @lid resolve failed', e instanceof Error ? e.message : String(e)).catch(() => {})
     }
   }
   const resolvedMasked = maskPhone(resolvedPhone)
 
   // Fix 2: Server-side enforcement — server bertanggung jawab atas keamanan, bukan mendelegasikan
   // ke consumer. Bila expectedPhone diset, tolak match jika nomor pengirim tidak sesuai.
-  if (candidate.expectedPhone) {
+  // Pengecualian: @lid yang gagal di-resolve — nomor asli tidak diketahui, tidak bisa dibandingkan.
+  if (candidate.expectedPhone && lidResolved) {
     const expected = normalizePhone(candidate.expectedPhone)
     if (expected && resolvedPhone !== expected) {
       appLog(
