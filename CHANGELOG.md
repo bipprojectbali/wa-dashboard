@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.12] - 2026-07-01
+
+### Added
+- **Soft lock tab Pesan** — tab `/wa?tab=messages` kini dilindungi password (prevensi tampilan tidak disengaja). State tersimpan di `sessionStorage` (hilang saat tab ditutup); tombol "Kunci" manual tersedia di header panel.
+- **Pagination tab Pesan** — daftar pesan dipaginasi 20 baris per halaman dengan Mantine `<Pagination>`. Filter search/tanggal otomatis reset ke halaman 1.
+
+### Fixed
+- **Notifikasi simpan WA Policy tidak muncul** — `key={policy.updatedAt}` di `WaPolicyPanel` menyebabkan `WaPolicySettings` unmount+remount setiap save berhasil (mutation state reset ke idle sebelum browser melukis). Dihapus; diganti `useEffect` sync form dari prop terbaru.
+
 ## [0.1.11] - 2026-07-01
 
 ### Added

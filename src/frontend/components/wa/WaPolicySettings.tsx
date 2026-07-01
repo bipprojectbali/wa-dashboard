@@ -1,6 +1,6 @@
 import { Alert, Button, Card, Group, NumberInput, Stack, Switch, Text, Textarea, Title } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TbDeviceFloppy, TbRestore } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/apiFetch'
 import type { PolicyEditable, WaPolicy } from './wa-policy.types'
@@ -31,6 +31,10 @@ function toEditable(p: WaPolicy): PolicyEditable {
 export function WaPolicySettings({ policy, canEdit }: Props) {
   const qc = useQueryClient()
   const [form, setForm] = useState<PolicyEditable>(() => toEditable(policy))
+
+  useEffect(() => {
+    setForm(toEditable(policy))
+  }, [policy])
 
   const save = useMutation({
     mutationFn: () => {

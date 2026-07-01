@@ -35,7 +35,7 @@ export function WaPolicyPanel() {
       )}
       <WaContractView contract={contract} ack={ack} />
       <WaPolicyUsage usage={usage} />
-      <WaPolicySettings key={policy.updatedAt} policy={policy} canEdit={canEdit} />
+      <WaPolicySettings policy={policy} canEdit={canEdit} />
     </Stack>
   )
 }
