@@ -38,6 +38,7 @@ async function rawFetch(path: string, init?: RequestInit, jsonHeaders = true): P
   try {
     return await fetch(`${baseUrl()}${path}`, {
       ...init,
+      signal: AbortSignal.timeout(env.WA_API_TIMEOUT_MS),
       headers: {
         ...(jsonHeaders ? { 'Content-Type': 'application/json' } : {}),
         'x-api-key': env.WA_API_KEY,
@@ -45,8 +46,9 @@ async function rawFetch(path: string, init?: RequestInit, jsonHeaders = true): P
       },
     })
   } catch (e) {
-    // Network-level failure (DNS, TLS, container down) — fetch itself rejects.
-    throw new WaUpstreamError(`WA container unreachable at ${path}: ${e instanceof Error ? e.message : String(e)}`)
+    // Network-level failure (DNS, TLS, container down, timeout) — fetch itself rejects.
+    const reason = e instanceof Error ? e.message : String(e)
+    throw new WaUpstreamError(`WA container unreachable at ${path}: ${reason}`)
   }
 }
 
@@ -111,3 +113,11 @@ export const fetchChatMessages = (id: string, chatId: string, limit: number) =>
     method: 'POST',
     body: JSON.stringify({ chatId, searchOptions: { limit } }),
   })
+
+// Resolve contactId (@lid, @c.us, digit) → full contact object including real phone number.
+// Dipakai matcher WAV untuk mengubah identifier @lid menjadi nomor HP asli sebelum disimpan.
+export const getContactById = (id: string, contactId: string) =>
+  waFetch<{ success: boolean; result?: { number?: string; id?: { _serialized?: string }; pushname?: string } }>(
+    `/client/getContactById/${id}`,
+    { method: 'POST', body: JSON.stringify({ contactId }) },
+  )

@@ -83,12 +83,26 @@ Sebelum diteruskan ke container, tiap kirim melewati `checkAndConsume()` di
 kebijakan: belum ack / first-contact) atau **429** (rate/cooldown, sertakan
 `retryAfter` detik). Pemblokiran dicatat `appLog('warn')` + audit `WA_SEND_BLOCKED`.
 
+### Balasan otomatis WAV (`WaPolicy.verifyReplyEnabled`)
+
+Saat verifikasi nomor (WAV) **berhasil**, nomor server dapat membalas user dengan pesan
+"berhasil" — aman karena reply-to-inbound (user kirim duluan), bukan cold outreach.
+**Default MATI** (`verifyReplyEnabled=false`) agar nomor server tetap receive-only. Dipicu
+best-effort dari `handleInbound` (blok pemenang match) via `sendVerifyReply()` di
+`src/lib/wa-verify-reply.ts`: (1) berhenti bila switch MATI, (2) **idempotency claim**
+(`VerifyRequest.replySentAt`, cegah balasan dobel dari poller re-run), (3) gate
+`checkAndConsume(..., { skipOutreachGates: true })` — melewati aturan ack & first-contact
+(khusus kirim-duluan) tapi tetap tunduk min-interval/cooldown/plafon; plafon tercapai →
+balasan **di-skip diam** (verifikasi tetap sukses via polling/webhook), (4) kirim teks
+(`verifyReplyMessage` atau varian default), audit `WA_VERIFY_REPLY_SENT`. Kegagalan kirim
+di-`appLog('warn')`, tak pernah menggagalkan verifikasi.
+
 ### WA Policy (kontrak anti-ban)
 
 | Method | Path | Guard | Description |
 |--------|------|-------|-------------|
 | GET | `/api/wa/policy` | guardAdmin | Policy global + usage kuota user + status ack + teks kontrak + `canEdit` |
-| PUT | `/api/wa/policy` | guardSuperAdmin | Update policy (semua field wajib, tervalidasi range), audit `WA_POLICY_UPDATED` |
+| PUT | `/api/wa/policy` | guardSuperAdmin | Update policy (semua field wajib, tervalidasi range) termasuk `verifyReplyEnabled` (bool) + `verifyReplyMessage` (opsional, nullable, maxLength 500 — null = pakai teks default), audit `WA_POLICY_UPDATED` |
 | POST | `/api/wa/policy/ack` | guardAdmin | Catat acknowledge kontrak versi terbaru, audit `WA_POLICY_ACK` |
 | DELETE | `/api/wa/policy/ack` | guardAdmin | Batalkan acknowledge (hapus key Redis ack), audit `WA_POLICY_ACK_REVOKED`. Pengiriman kembali tergate `requireAck` |
 
@@ -153,7 +167,7 @@ kosong = **discovery** (nomor pengirim jadi nomor terverifikasi).
 
 ### Simulasi Login (proxy SUPER_ADMIN, auth: session cookie)
 
-Menjalankan alur WAV end-to-end lewat browser untuk uji pra-rilis (route `/simulation`).
+Menjalankan alur WAV end-to-end lewat browser untuk uji pra-rilis (tab `/wa?tab=simulation`).
 **Proxy server-side**: endpoint cookie-auth menjalankan start/poll memakai consumer reserved
 `[simulation]` (lazy-create, idempoten via `getOrCreateSimConsumer`) — **API key tak pernah ke
 browser**, tapi pipeline yang dijalankan 100% asli. Request sim = `VerifyRequest` biasa →

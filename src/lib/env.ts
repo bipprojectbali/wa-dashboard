@@ -28,6 +28,8 @@ export const env = {
   MCP_SECRET_ADMIN: optional('MCP_SECRET_ADMIN', ''),
   WA_API_BASE_URL: optional('WA_API_BASE_URL', '').replace(/\/$/, ''),
   WA_API_KEY: optional('WA_API_KEY', ''),
+  // Timeout (ms) untuk setiap request ke WA container. Default 15s.
+  WA_API_TIMEOUT_MS: parseInt(optional('WA_API_TIMEOUT_MS', '15000'), 10),
   // Nomor WA server tujuan kirim token verifikasi inbound (untuk ditampilkan ke user).
   WA_VERIFY_SERVER_NUMBER: optional('WA_VERIFY_SERVER_NUMBER', ''),
 } as const

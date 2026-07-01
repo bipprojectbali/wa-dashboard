@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.17] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` masih berisi digit LID meski fallback `getContacts` sudah ditambah** — `getContacts` pun tidak menemukan nomor untuk kontak @lid karena format `id._serialized` yang dicocokkan tidak match. Solusi definitif: poller (`wa-verify-poller.ts`) kini meneruskan `chat.contact.number` dari respons `getChats` sebagai field `contactNumber` di `NewInbound`. `handleInbound` memakai ini sebagai sumber pertama (tanpa API call tambahan) sebelum mencoba `getContactById` → `getContacts` sebagai fallback berlapis. Chat object dari wwebjs-api menyertakan `contact.number` dengan nomor HP asli bahkan untuk kontak @lid.
+
+## [0.1.16] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` menyimpan digit LID saat `getContactById` tidak mengembalikan `number`** — ditambahkan fallback ke `getContacts` (list lengkap semua kontak): dicari entry dengan `id._serialized === contactId`. Jika ditemukan, `number` dari kontak dipakai sebagai `resolvedPhone` dan `lidResolved=true` (Fix 2 berlaku). Bila kedua cara gagal, dicatat warning `WA verify @lid unresolved` dan Fix 2 di-skip (nomor asli tidak diketahui).
+
+## [0.1.15] - 2026-07-01
+
+### Fixed
+- **Verifikasi @lid selalu gagal saat `expectedPhone` diset** — `getContactById` container kemungkinan tidak tersedia; error sebelumnya ditelan diam sehingga `resolvedPhone` tetap berisi digit LID, lalu Fix 2 menolak karena LID ≠ nomor HP. Sekarang: error `getContactById` dicatat di app log (`WA verify @lid resolve failed` / `unresolved`); bila @lid gagal di-resolve, pengecekan `expectedPhone` di-skip (nomor asli tidak diketahui, tidak bisa dibandingkan). Verifikasi tetap lolos; konsekuensi: `matchedPhone` menyimpan digit LID bukan nomor HP untuk kontak jenis ini.
+
+## [0.1.14] - 2026-07-01
+
+### Fixed
+- **`matchedPhone` menyimpan digit LID untuk kontak @lid** — kontak modern WhatsApp diidentifikasi dengan format `@lid` (Linked Device ID), bukan nomor HP. Server kini memanggil `getContactById` di container untuk mendapatkan nomor HP asli, sehingga `matchedPhone` di `VerifyRequest` selalu berisi nomor HP yang bisa dibaca. Fallback ke digit LID bila container error (best-effort).
+- **Keamanan server-side `expectedPhone`** — sebelumnya server menandai VERIFIED meskipun nomor pengirim berbeda dari `expectedPhone`, dan mendelegasikan validasinya ke consumer. Kini server yang bertanggung jawab: bila `expectedPhone` diset, pencocokan ditolak (silent, `matched:false`) jika nomor pengirim tidak sesuai. Warning `WA verify phone mismatch` dicatat di app log dengan nomor ter-mask.
+
+## [0.1.13] - 2026-07-01
+
+### Fixed
+- **Balasan otomatis WAV gagal untuk kontak @lid** — rekonstruksi `phone@c.us` gagal karena WhatsApp kini mengidentifikasi sebagian kontak dengan format LID (`@lid`). Fix: pass `from` asli dari pesan masuk (sudah berisi sufiks `@c.us`/`@lid`) langsung ke `sendVerifyReply`, tanpa rekonstruksi.
+
+## [0.1.12] - 2026-07-01
+
+### Added
+- **Soft lock tab Pesan** — tab `/wa?tab=messages` kini dilindungi password (prevensi tampilan tidak disengaja). State tersimpan di `sessionStorage` (hilang saat tab ditutup); tombol "Kunci" manual tersedia di header panel.
+- **Pagination tab Pesan** — daftar pesan dipaginasi 20 baris per halaman dengan Mantine `<Pagination>`. Filter search/tanggal otomatis reset ke halaman 1.
+
+### Fixed
+- **Notifikasi simpan WA Policy tidak muncul** — `key={policy.updatedAt}` di `WaPolicyPanel` menyebabkan `WaPolicySettings` unmount+remount setiap save berhasil (mutation state reset ke idle sebelum browser melukis). Dihapus; diganti `useEffect` sync form dari prop terbaru.
+
+## [0.1.11] - 2026-07-01
+
+### Added
+- **Balasan otomatis WhatsApp saat verifikasi (WAV) berhasil** — nomor server dapat membalas user dengan pesan "berhasil" saat verifikasi sukses (aman: reply-to-inbound, bukan cold outreach). **Default MATI** (`WaPolicy.verifyReplyEnabled=false`) agar nomor server tetap receive-only sampai sengaja dinyalakan di `/wa?tab=policy` (SUPER_ADMIN). Teks bisa diedit kapanpun (`verifyReplyMessage`) dengan **default yang bisa dikembalikan** (kosong/null → varian default di kode, dipilih deterministik per-request agar tak seragam identik). Balasan dipicu best-effort dari `handleInbound` via `sendVerifyReply()` (`src/lib/wa-verify-reply.ts`): **idempoten** (`VerifyRequest.replySentAt` claim-then-send, cegah dobel dari poller re-run), tergate **rate-only** (`checkAndConsume(..., { skipOutreachGates: true })` — lewati ack & first-contact yang khusus kirim-duluan, tetap tunduk min-interval/cooldown/plafon; plafon tercapai → balasan di-skip diam, verifikasi tetap sukses), audit `WA_VERIFY_REPLY_SENT`. Zero PII (teks tak menyisipkan nomor/token). Field baru `WaPolicy.verifyReplyEnabled`/`verifyReplyMessage` + `VerifyRequest.replySentAt`.
+
+## [0.1.10] - 2026-07-01
+
+### Changed
+- **Konsolidasi navigasi WhatsApp ke satu menu `/wa`** — panel operator **WA Sessions** dan **Simulasi Login WAV** yang sebelumnya tersebar (tab `/dev?tab=wa-sessions` dan route standalone `/simulation`) kini menjadi tab di dalam `/wa` (`?tab=sessions` & `?tab=simulation`), khusus SUPER_ADMIN di bawah divider "Operator". Sidebar `/dev` menyisakan satu link "WhatsApp" sebagai entry-point tunggal. Route `/simulation` dihapus (komponen `SimLoginPanel` dipakai ulang sebagai tab). Tak ada perubahan endpoint/backend — semua REST WAV (`/api/wa/verify/sim/*`, `/api/admin/wa-sessions`) tetap sama.
+
+## [0.1.9] - 2026-06-30
+
+### Fixed
+- **Verifikasi nomor (WAV) tidak pernah jalan di produksi/staging** — request verifikasi selalu PENDING walau `WA_VERIFY_SERVER_NUMBER` sudah diset. Penyebab: `startWaVerifySupervisor()` (plus `sweepWaVerify()` dan audit cleanup) hanya dipanggil di entry dev `src/index.tsx`, sedangkan produksi menjalankan binary dari `src/server.prod.ts` yang tidak pernah memanggilnya — supervisor capture poller tak pernah boot (`running:false`, `serverNumber:null`), token masuk tak tertangkap. Semua boot task kini diekstrak ke `src/lib/startup.ts` (`runStartupTasks()`) yang dipanggil **kedua** entry, plus test guard anti-drift. Wajib redeploy agar aktif.
+- **Tool MCP `debug-stg` rusak (protokol usang)** — seluruh tool inspeksi staging via `POST /mcp` membalas 400 "Invalid JSON-RPC message". Endpoint `/mcp` sudah memakai MCP Streamable HTTP standar (`tools/call`), tapi tool masih mengirim body lama `{tool, input}` dan tanpa header `Accept` (406). Ditambahkan helper `mcpCallBody`/`unwrapMcpEnvelope`/`stgMcpCall` di `scripts/mcp/tools/stg-fetch.ts`; 22 call-site dialihkan ke JSON-RPC standar + header `Accept` yang benar.
+
+## [0.1.8] - 2026-06-30
+
+### Fixed
+- **WA container request hang selamanya** — `rawFetch` di `src/lib/wa-client.ts` kini menyertakan `AbortSignal.timeout(WA_API_TIMEOUT_MS)` (default 15s). Sebelumnya tidak ada timeout: jika container lambat/down, semua pemanggil (`/api/admin/wa-sessions`, poller `reconcile()`, `pollOnce()`, dll) hang tanpa batas — panel WA Sessions hanya menampilkan "Loading..." selamanya dan WAV supervisor tidak pernah menemukan `sessionId` sehingga polling inbound tidak jalan. Setelah timeout, request gagal cepat dengan `WaUpstreamError` 502 (bukan hang), poller retry otomatis di siklus reconcile berikutnya. Env baru `WA_API_TIMEOUT_MS` (opsional, default `15000`).
+- **Startup migration crash loop di staging** — `src/lib/migrate.ts` kini memeriksa `DIRECT_URL` sebelum jatuh ke `DATABASE_URL`. Sebelumnya migrator pakai `DATABASE_URL` (PgBouncer) yang meng-inject parameter `pgbouncer=true`; PgBouncer menolak dengan `PostgresError: unsupported startup parameter: pgbouncer (08P01)`, menyebabkan crash loop tanpa batas. Dengan `DIRECT_URL` sebagai fallback kedua, migrator otomatis bypass PgBouncer (sama seperti `prisma.config.ts`).
+
 ## [0.1.4] - 2026-06-25
 
 ### Fixed

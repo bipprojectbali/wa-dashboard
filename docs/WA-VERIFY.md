@@ -196,6 +196,36 @@ Timeout per attempt: `10s` (AbortController).
 
 ---
 
+## Balasan otomatis ke user (opsional, default MATI)
+
+Selain webhook ke consumer, nomor server **dapat membalas user via WhatsApp** saat
+verifikasi berhasil ("Nomor Anda berhasil terverifikasi…"). Ini aman: membalas pesan
+**inbound** (user kirim duluan) adalah pola kirim paling aman — bukan cold outreach.
+
+**Default MATI** (`WaPolicy.verifyReplyEnabled=false`) untuk menjaga sifat *receive-only*
+(nyaris unbannable) nomor server sampai operator sengaja menyalakan di `/wa?tab=policy`
+(SUPER_ADMIN). Teks kustom via `verifyReplyMessage`; kosong/null → varian default di kode
+(`DEFAULT_VERIFY_REPLY_MESSAGE`, dipilih deterministik per-request agar tak seragam identik
+— anti sidik-jari spam). Tombol "Kembalikan ke default" di UI mengembalikan ke null.
+
+Alur (`sendVerifyReply()` di `src/lib/wa-verify-reply.ts`, dipicu best-effort dari
+`handleInbound` blok pemenang match — sejajar dispatch webhook):
+1. Berhenti bila `verifyReplyEnabled` MATI.
+2. **Idempotency claim**: `updateMany` set `VerifyRequest.replySentAt` dengan guard
+   `status=VERIFIED, replySentAt=null` → hanya satu pemenang. Poller yang re-run / match
+   dobel → `count=0` → berhenti (tak kirim dobel).
+3. Rekonstruksi `chatId = <matchedPhone>@c.us` (hindari `@lid` yang tak selalu bisa dibalas).
+4. Gate `checkAndConsume(sessionId, chatId, { skipOutreachGates: true })` — melewati aturan
+   **ack** & **first-contact** (khusus kirim-duluan manual; balasan inbound tak butuh)
+   tapi tetap tunduk **min-interval, cooldown per-nomor, plafon volume**. Plafon tercapai →
+   balasan **di-skip diam** (`appLog('info')`), verifikasi TETAP sukses via polling/webhook.
+5. `wa.sendMessage(...)` + audit `WA_VERIFY_REPLY_SENT`. Kegagalan upstream di-`appLog('warn')`,
+   tak pernah menggagalkan verifikasi.
+
+Zero PII: teks balasan tak pernah menyisipkan nomor/token.
+
+---
+
 ## Endpoint
 
 ### Consumer-facing (auth: API key `x-api-key`)
@@ -261,7 +291,7 @@ replay), `WaVerifyInbound` (raw log, SUPER_ADMIN saja). Lihat `docs/FRONTEND.md`
 
 ## Simulasi Login (browser, pra-rilis)
 
-Route standalone `/simulation` (SUPER_ADMIN) menjalankan alur login WAV end-to-end
+Tab `/wa?tab=simulation` (SUPER_ADMIN) menjalankan alur login WAV end-to-end
 lewat browser sebelum rilis: dari "halaman login palsu" → klik → buka WhatsApp dengan
 token terisi → operator kirim → dashboard poll sampai `VERIFIED`. Sifatnya uji, jadi
 ikut menampilkan **log timeline berstempel waktu** tiap langkah (untuk developer).

@@ -16,6 +16,8 @@ const policyBody = t.Object({
   minIntervalSeconds: t.Integer({ minimum: 0, maximum: 3600 }),
   perRecipientCooldownSeconds: t.Integer({ minimum: 0, maximum: 86400 }),
   requireAck: t.Boolean(),
+  verifyReplyEnabled: t.Boolean(),
+  verifyReplyMessage: t.Optional(t.Nullable(t.String({ maxLength: 500 }))),
 })
 
 export const waPolicyRouter = new Elysia({ tags: ['WA'] })

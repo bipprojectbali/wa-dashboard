@@ -196,6 +196,11 @@ model WaPolicy {
   perRecipientCooldownSeconds Int      @default(60)
   requireAck                  Boolean  @default(true)
   contractVersion             Int      @default(1)
+  // Balasan otomatis WhatsApp saat verifikasi WAV berhasil. Default MATI agar nomor
+  // server tetap receive-only (unbannable) sampai sengaja dinyalakan. Pesan null =
+  // pakai teks default di kode (bisa dikembalikan dari UI).
+  verifyReplyEnabled          Boolean  @default(false)
+  verifyReplyMessage          String?
   updatedAt                   DateTime @updatedAt
   updatedById                 String?
 
@@ -238,6 +243,9 @@ model VerifyRequest {
   deliveryAttempts Int            @default(0)
   lastDeliveryAt   DateTime?
   lastDeliveryError String?
+  // Penanda idempotency balasan WA (claim-then-send): diisi saat balasan sukses berhasil
+  // di-claim, mencegah poller yang re-run mengirim balasan dobel ke user.
+  replySentAt      DateTime?
   createdAt        DateTime       @default(now())
 
   consumer VerifyConsumer @relation(fields: [consumerId], references: [id], onDelete: Cascade)

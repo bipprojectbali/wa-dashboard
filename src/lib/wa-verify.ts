@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto'
 import { appLog } from './applog'
 import { prisma } from './db'
+import * as wa from './wa-client'
 
 // WhatsApp Inbound Verify (WAV) — matcher. Listener menyerahkan tiap pesan masuk
-// ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Capture-only:
-// TIDAK PERNAH membalas ke user (anti-ban) dan TIDAK menyentuh wa-policy (gate outbound).
+// ke sini; kita cocokkan token one-time dengan VerifyRequest PENDING. Matcher tetap
+// murni (tak menyentuh wa-policy langsung); balasan opsional saat match dipicu best-effort
+// via modul terpisah `wa-verify-reply` (default MATI, tergate rate anti-ban, idempoten).
 
 // Alfabet base32 tanpa karakter ambigu (tanpa 0/1/8/9, O/I/L/B). Token = WAV- + 8 char.
 const TOKEN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ234567'
@@ -67,6 +69,7 @@ interface InboundMessage {
   body?: string
   fromMe?: boolean
   id?: unknown
+  contactNumber?: string // nomor HP asli dari chat.contact.number (diteruskan poller)
 }
 
 // id container bisa string atau objek { _serialized }. Ambil bentuk string aman.
@@ -83,6 +86,33 @@ export interface InboundResult {
   matched: boolean
   consumerId?: string
   requestId?: string
+}
+
+// Resolve @lid contactId → nomor HP asli (best-effort, best-of-two):
+// 1. getContactById — cepat, tapi kadang tidak mengembalikan `number` untuk @lid
+// 2. getContacts (full list) — lebih berat tapi lebih lengkap; filter by id._serialized
+// Kembalikan null bila kedua cara gagal → caller pakai digit LID sebagai fallback.
+type ContactEntry = { id?: { _serialized?: string }; number?: string }
+type ContactsResp = { success: boolean; result?: ContactEntry[] }
+async function resolvePhoneFromContactId(sessionId: string, contactId: string): Promise<string | null> {
+  try {
+    const c = await wa.getContactById(sessionId, contactId)
+    const num = c?.result?.number?.replace(/\D/g, '')
+    if (num) return num
+  } catch {
+    /* fallthrough to contacts list */
+  }
+
+  try {
+    const all = (await wa.getContacts(sessionId)) as ContactsResp
+    const found = (all?.result ?? []).find((c) => c?.id?._serialized === contactId)
+    const num = found?.number?.replace(/\D/g, '')
+    if (num) return num
+  } catch {
+    /* ignore */
+  }
+
+  return null
 }
 
 // Proses satu pesan masuk. sessionId = WA session id (= dashboard user id).
@@ -108,7 +138,7 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
   const now = new Date()
   const candidate = await prisma.verifyRequest.findFirst({
     where: { token, status: 'PENDING', expiresAt: { gt: now } },
-    select: { id: true, consumerId: true },
+    select: { id: true, consumerId: true, expectedPhone: true },
   })
 
   if (!candidate) {
@@ -117,27 +147,72 @@ export async function handleInbound(sessionId: string, message: InboundMessage):
     return { matched: false }
   }
 
+  // Fix 1: Resolve @lid → nomor HP asli. Tiga sumber secara berurutan (stop di yang pertama berhasil):
+  // 1. chat.contact.number dari poller (tanpa API call tambahan) — paling efisien
+  // 2. getContactById container — cepat tapi kadang tidak punya `number`
+  // 3. getContacts full list — lebih berat, filter by id._serialized
+  // Fallback ke digit LID bila semua gagal.
+  let resolvedPhone = phone
+  let lidResolved = !from.endsWith('@lid') // @c.us sudah punya nomor asli; @lid perlu resolve
+  if (from.endsWith('@lid')) {
+    const fromChat = message.contactNumber
+    if (fromChat) {
+      resolvedPhone = fromChat
+      lidResolved = true
+    } else {
+      const resolved = await resolvePhoneFromContactId(sessionId, from)
+      if (resolved) {
+        resolvedPhone = resolved
+        lidResolved = true
+      } else {
+        appLog('warn', 'WA verify @lid unresolved', `from=${phone}`).catch(() => {})
+      }
+    }
+  }
+  const resolvedMasked = maskPhone(resolvedPhone)
+
+  // Fix 2: Server-side enforcement — server bertanggung jawab atas keamanan, bukan mendelegasikan
+  // ke consumer. Bila expectedPhone diset, tolak match jika nomor pengirim tidak sesuai.
+  // Pengecualian: @lid yang gagal di-resolve — nomor asli tidak diketahui, tidak bisa dibandingkan.
+  if (candidate.expectedPhone && lidResolved) {
+    const expected = normalizePhone(candidate.expectedPhone)
+    if (expected && resolvedPhone !== expected) {
+      appLog(
+        'warn',
+        'WA verify phone mismatch',
+        `request=${candidate.id} expected=${maskPhone(expected)} actual=${resolvedMasked}`,
+      ).catch(() => {})
+      await writeInboundLog(sessionId, resolvedMasked, token, false, candidate.consumerId)
+      return { matched: false }
+    }
+  }
+
   // Guard status=PENDING di updateMany → hanya satu pemenang walau pesan dobel.
   const res = await prisma.verifyRequest.updateMany({
     where: { id: candidate.id, status: 'PENDING', expiresAt: { gt: now } },
     data: {
       status: 'VERIFIED',
-      matchedPhone: phone,
+      matchedPhone: resolvedPhone,
       matchedMessageId: extractMessageId(message.id),
       verifiedAt: now,
     },
   })
 
   const won = res.count === 1
-  await writeInboundLog(sessionId, masked, token, won, candidate.consumerId)
+  await writeInboundLog(sessionId, resolvedMasked, token, won, candidate.consumerId)
 
   if (won) {
-    appLog('info', 'WA verify matched', `consumer=${candidate.consumerId} from=${masked}`).catch(() => {})
+    appLog('info', 'WA verify matched', `consumer=${candidate.consumerId} from=${resolvedMasked}`).catch(() => {})
     // Picu webhook async (best-effort). Dynamic import memutus circular dependency
     // dengan listener/boot dan menjaga matcher tetap murni.
     import('./wa-verify-webhook')
       .then((m) => m.deliverVerified(candidate.id))
       .catch((e) => appLog('warn', 'WA verify webhook dispatch failed', String(e)).catch(() => {}))
+    // Balasan otomatis ke user (best-effort, default MATI). Dynamic import menjaga matcher
+    // murni & memutus circular dependency. from = chatId asli (@c.us/@lid) dari pesan masuk.
+    import('./wa-verify-reply')
+      .then((m) => m.sendVerifyReply(candidate.id, sessionId, from))
+      .catch((e) => appLog('warn', 'WA verify reply dispatch failed', String(e)).catch(() => {}))
   }
 
   return { matched: won, consumerId: candidate.consumerId, requestId: candidate.id }

@@ -10,6 +10,14 @@
         "GH_TOKEN": "${GH_TOKEN}",
         "GH_REPO": "${GH_REPO}"
       }
+    },
+    "debug-stg": {
+      "command": "bun",
+      "args": ["run", "scripts/mcp/stg-server.ts"],
+      "env": {
+        "BASE_URL": "${STG_BASE_URL}",
+        "MCP_SECRET": "${STG_MCP_SECRET}"
+      }
     }
   }
 }

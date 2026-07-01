@@ -51,11 +51,13 @@ if (process.env.MIGRATE_ON_STARTUP !== 'false') {
   await runMigrations()
 }
 
-// ─── TODO: Add project-specific startup tasks here ────
-// Examples:
-//   import { cleanupOldLogs } from './lib/cleanup'
-//   cleanupOldLogs().catch(console.error)
-//   setInterval(() => cleanupOldLogs().catch(console.error), 24 * 60 * 60 * 1000)
+// ─── Startup Tasks (audit rotation, WAV supervisor, WAV sweep) ──────────
+// Sumber tunggal dibagi dengan entry dev (src/index.tsx). WAJIB dipanggil di sini —
+// tanpa ini WAV supervisor tak pernah boot di produksi (request verifikasi PENDING
+// selamanya meski env WA_VERIFY_SERVER_NUMBER lengkap).
+import { runStartupTasks } from './lib/startup'
+
+runStartupTasks()
 
 // ─── Elysia App ────────────────────────────────────────
 import { createApp } from './app'

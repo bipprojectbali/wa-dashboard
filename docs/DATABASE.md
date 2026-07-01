@@ -36,16 +36,21 @@ kosongkan `DIRECT_URL` (otomatis fallback). Runtime app tetap selalu lewat
 | `Ticket` | id, title, description, status, priority, route?, reporterId, assigneeId?, timestamps, closedAt? |
 | `TicketComment` | id, ticketId, authorId?, authorTag, body, createdAt |
 | `TicketEvidence` | id, ticketId, kind, url, note?, createdAt |
-| `WaPolicy` | id (`global` singleton), allowFirstContact, maxPerMinute/Hour/Day, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, updatedAt, updatedById? |
+| `WaPolicy` | id (`global` singleton), allowFirstContact, maxPerMinute/Hour/Day, minIntervalSeconds, perRecipientCooldownSeconds, requireAck, contractVersion, verifyReplyEnabled, verifyReplyMessage?, updatedAt, updatedById? |
 | `VerifyConsumer` | id, name, apiKeyHash (unique), apiKeyPrefix, webhookUrl?, webhookSecret, active, createdById?, timestamps — app eksternal yang memakai WAV |
-| `VerifyRequest` | id (= polling id), consumerId, token (unique), expectedPhone?, status, matchedPhone?, matchedMessageId?, expiresAt, verifiedAt?, deliveryStatus, deliveryAttempts, lastDeliveryAt?, lastDeliveryError?, createdAt |
+| `VerifyRequest` | id (= polling id), consumerId, token (unique), expectedPhone?, status, matchedPhone?, matchedMessageId?, expiresAt, verifiedAt?, deliveryStatus, deliveryAttempts, lastDeliveryAt?, lastDeliveryError?, replySentAt?, createdAt |
 | `VerifyInboundLog` | id, sessionId, fromMasked, tokenFound?, matched, consumerId?, createdAt — audit pesan masuk (nomor ter-mask) |
 
 Enums: `Role` = `USER | QC | ADMIN | SUPER_ADMIN`; `TicketStatus` = `OPEN | IN_PROGRESS | READY_FOR_QC | REOPENED | CLOSED`; `TicketPriority` = `LOW | MEDIUM | HIGH | CRITICAL`; `VerifyStatus` = `PENDING | VERIFIED | EXPIRED`; `VerifyDelivery` = `PENDING | DELIVERED | FAILED | DISABLED`
 
 `WaPolicy` adalah singleton (1 baris `id="global"`). Dibuat lazy lewat `getPolicy()`
 (upsert) — tidak perlu seed. Default aman out-of-the-box: `allowFirstContact=false`,
-`requireAck=true`, cap 3/menit·20/jam·100/hari. Lihat `docs/WA-POLICY.md`.
+`requireAck=true`, cap 3/menit·20/jam·100/hari, `verifyReplyEnabled=false` (balasan
+otomatis WAV MATI). `verifyReplyMessage=null` → server pakai teks default di kode
+(bisa dikembalikan dari UI). Lihat `docs/WA-POLICY.md`.
+
+`VerifyRequest.replySentAt` = penanda idempotency balasan WA (claim-then-send): diisi
+saat balasan berhasil di-claim agar poller yang re-run tak mengirim balasan dobel.
 
 Model `Verify*` adalah fitur **WAV (WhatsApp Inbound Verification)**. `VerifyConsumer`
 = app eksternal terdaftar (API key di-hash, plaintext hanya sekali). `VerifyRequest`
@@ -54,7 +59,7 @@ Model `Verify*` adalah fitur **WAV (WhatsApp Inbound Verification)**. `VerifyCon
 sweep ~24 jam). WAV memakai satu Redis key: `wa:verify:watermark:<sessionId>`
 (watermark capture poller, lihat tabel di bawah). Lihat `docs/WA-VERIFY.md`.
 
-Halaman Simulasi Login (`/simulation`) memakai satu `VerifyConsumer` reserved bernama
+Tab Simulasi Login (`/wa?tab=simulation`) memakai satu `VerifyConsumer` reserved bernama
 `[simulation]` (lazy-create idempoten via `getOrCreateSimConsumer`, `webhookUrl=null` →
 polling-only). Request simulasi adalah `VerifyRequest` biasa milik consumer itu — tak ada
 tabel/schema baru. Lihat `docs/WA-VERIFY.md`.
@@ -101,7 +106,7 @@ Logs API requests via `onAfterResponse` hook (skips `/api/auth/*`). Auto-rotates
 ## Audit Logs (DB)
 
 Persistent user activity trail in `AuditLog` table.
-Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`, `WA_VERIFY_CONSUMER_CREATED`, `WA_VERIFY_CONSUMER_UPDATED`, `WA_VERIFY_CONSUMER_DELETED`, `WA_VERIFY_KEY_REGENERATED`, `WA_VERIFY_SECRET_REVEALED`, `WA_VERIFY_REPLAY`, `WA_VERIFY_REQUESTS_DELETED`, `WA_VERIFY_INBOUND_DELETED`, `WA_VERIFY_SIM_START`, `WA_SESSION_TERMINATED`
+Actions: `LOGIN`, `LOGOUT`, `LOGIN_FAILED`, `LOGIN_BLOCKED`, `ROLE_CHANGED`, `BLOCKED`, `UNBLOCKED`, `TICKET_CREATED`, `TICKET_UPDATED`, `WA_SEND_BLOCKED`, `WA_POLICY_UPDATED`, `WA_POLICY_ACK`, `WA_POLICY_ACK_REVOKED`, `WA_VERIFY_CONSUMER_CREATED`, `WA_VERIFY_CONSUMER_UPDATED`, `WA_VERIFY_CONSUMER_DELETED`, `WA_VERIFY_KEY_REGENERATED`, `WA_VERIFY_SECRET_REVEALED`, `WA_VERIFY_REPLAY`, `WA_VERIFY_REQUESTS_DELETED`, `WA_VERIFY_INBOUND_DELETED`, `WA_VERIFY_SIM_START`, `WA_SESSION_TERMINATED`, `WA_VERIFY_REPLY_SENT`
 Auto-cleanup: records older than `AUDIT_LOG_RETENTION_DAYS` (default 90) — runs on startup + every 24h.
 
 ## WhatsApp API (wwebjs-api container)
@@ -112,5 +117,6 @@ External REST container ([wwebjs-api](https://github.com/avoylenko/wwebjs-api)),
 |-----|---------|------------|
 | `WA_API_BASE_URL` | `''` (trailing slash dibuang) | Base URL container, mis. `https://wa-api.wibudev.com` |
 | `WA_API_KEY` | `''` | Disuntik sebagai header `x-api-key` — jangan commit nilainya, jangan kirim ke browser |
+| `WA_API_TIMEOUT_MS` | `15000` | Timeout (ms) setiap request ke container. Timeout → `WaUpstreamError` 502, bukan hang. |
 
 `sessionId` di container = dashboard `user.id` (1 sesi WhatsApp per user). WS relay via `src/lib/wa-bridge.ts` (butuh `ENABLE_WEBSOCKET=true` di container; fallback polling bila tidak aktif).

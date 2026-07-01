@@ -10,6 +10,8 @@ export interface WaPolicy {
   perRecipientCooldownSeconds: number
   requireAck: boolean
   contractVersion: number
+  verifyReplyEnabled: boolean
+  verifyReplyMessage: string | null
   updatedAt: string
   updatedById: string | null
 }
@@ -43,4 +45,6 @@ export type PolicyEditable = Pick<
   | 'minIntervalSeconds'
   | 'perRecipientCooldownSeconds'
   | 'requireAck'
+  | 'verifyReplyEnabled'
+  | 'verifyReplyMessage'
 >

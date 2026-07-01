@@ -1,7 +1,7 @@
-import { Alert, Button, Card, Group, NumberInput, Stack, Switch, Text, Title } from '@mantine/core'
+import { Alert, Button, Card, Group, NumberInput, Stack, Switch, Text, Textarea, Title } from '@mantine/core'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
-import { TbDeviceFloppy } from 'react-icons/tb'
+import { useEffect, useState } from 'react'
+import { TbDeviceFloppy, TbRestore } from 'react-icons/tb'
 import { apiFetch } from '@/frontend/lib/apiFetch'
 import type { PolicyEditable, WaPolicy } from './wa-policy.types'
 
@@ -9,6 +9,10 @@ interface Props {
   policy: WaPolicy
   canEdit: boolean
 }
+
+// Placeholder teks default balasan (dicerminkan dari DEFAULT_VERIFY_REPLY_MESSAGE di
+// src/lib/wa-verify-reply.ts). Textarea kosong → server pakai default (pesan disimpan null).
+const DEFAULT_REPLY_PLACEHOLDER = 'Nomor Anda berhasil terverifikasi. Terima kasih 🙏'
 
 function toEditable(p: WaPolicy): PolicyEditable {
   return {
@@ -19,6 +23,8 @@ function toEditable(p: WaPolicy): PolicyEditable {
     minIntervalSeconds: p.minIntervalSeconds,
     perRecipientCooldownSeconds: p.perRecipientCooldownSeconds,
     requireAck: p.requireAck,
+    verifyReplyEnabled: p.verifyReplyEnabled,
+    verifyReplyMessage: p.verifyReplyMessage,
   }
 }
 
@@ -26,13 +32,21 @@ export function WaPolicySettings({ policy, canEdit }: Props) {
   const qc = useQueryClient()
   const [form, setForm] = useState<PolicyEditable>(() => toEditable(policy))
 
+  useEffect(() => {
+    setForm(toEditable(policy))
+  }, [policy])
+
   const save = useMutation({
-    mutationFn: () =>
-      apiFetch('/api/wa/policy', {
+    mutationFn: () => {
+      // Teks balasan kosong → kirim null agar server memakai teks default (bisa dikembalikan).
+      const trimmed = form.verifyReplyMessage?.trim()
+      const payload = { ...form, verifyReplyMessage: trimmed ? trimmed : null }
+      return apiFetch('/api/wa/policy', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      }),
+        body: JSON.stringify(payload),
+      })
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['wa', 'policy'] }),
   })
 
@@ -72,6 +86,44 @@ export function WaPolicySettings({ policy, canEdit }: Props) {
           disabled={!canEdit}
           onChange={(e) => setForm((f) => ({ ...f, requireAck: e.currentTarget.checked }))}
         />
+
+        <Card withBorder padding="sm" bg="var(--mantine-color-default-hover)">
+          <Stack gap="xs">
+            <Switch
+              label="Balas otomatis saat verifikasi berhasil"
+              description="Nomor server membalas pesan user (aman: reply-to-inbound, lewat rate-limit)."
+              checked={form.verifyReplyEnabled}
+              disabled={!canEdit}
+              color="teal"
+              onChange={(e) => setForm((f) => ({ ...f, verifyReplyEnabled: e.currentTarget.checked }))}
+            />
+            <Textarea
+              label="Teks balasan"
+              description="Kosongkan untuk memakai teks default (yang bisa dikembalikan)."
+              placeholder={DEFAULT_REPLY_PLACEHOLDER}
+              value={form.verifyReplyMessage ?? ''}
+              disabled={!canEdit || !form.verifyReplyEnabled}
+              autosize
+              minRows={2}
+              maxRows={5}
+              maxLength={500}
+              onChange={(e) => setForm((f) => ({ ...f, verifyReplyMessage: e.currentTarget.value }))}
+            />
+            {canEdit && form.verifyReplyMessage != null && form.verifyReplyMessage.trim() !== '' && (
+              <Group>
+                <Button
+                  size="compact-xs"
+                  variant="subtle"
+                  color="gray"
+                  leftSection={<TbRestore size={14} />}
+                  onClick={() => setForm((f) => ({ ...f, verifyReplyMessage: null }))}
+                >
+                  Kembalikan ke default
+                </Button>
+              </Group>
+            )}
+          </Stack>
+        </Card>
 
         <Group grow>
           {num('maxPerMinute', 'Maks / menit', 'Plafon pesan per menit', 1)}
