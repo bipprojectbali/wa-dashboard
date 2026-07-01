@@ -7,6 +7,7 @@ import {
   Group,
   Menu,
   NavLink,
+  ScrollArea,
   Stack,
   Text,
   ThemeIcon,
@@ -26,17 +27,21 @@ import {
   TbLayoutDashboard,
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
+  TbLogin2,
   TbLogout,
   TbMessages,
   TbMoon,
   TbPlugConnected,
   TbSend,
+  TbServer,
   TbShieldCheck,
   TbShieldLock,
   TbSparkles,
   TbSun,
   TbUser,
 } from 'react-icons/tb'
+import { WaSessionsPanel } from '@/frontend/components/dev/WaSessionsPanel'
+import { SimLoginPanel } from '@/frontend/components/sim/SimLoginPanel'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { openWhatsNew } from '@/frontend/components/WhatsNewModal'
 import { WaAccountPanel } from '@/frontend/components/wa/WaAccountPanel'
@@ -50,7 +55,7 @@ import { useWaRealtime } from '@/frontend/hooks/useWaRealtime'
 import { authClient } from '@/lib/auth-client'
 import { rootRoute } from './__root'
 
-const validTabs = ['connection', 'account', 'send', 'messages', 'policy', 'verify'] as const
+const validTabs = ['connection', 'account', 'send', 'messages', 'policy', 'verify', 'sessions', 'simulation'] as const
 type WaTab = (typeof validTabs)[number]
 
 export const waRoute = createRoute({
@@ -86,6 +91,14 @@ const navItems = [
   { key: 'messages', label: 'Pesan', icon: TbMessages },
   { key: 'policy', label: 'Aturan & Kontrak', icon: TbShieldLock },
   { key: 'verify', label: 'Verifikasi Nomor', icon: TbShieldCheck },
+] as const
+
+// Tab khusus operator SUPER_ADMIN — WA Sessions (operator view semua sesi container)
+// & Simulation (uji alur WAV end-to-end). Digabung ke sidebar /wa agar semua fitur
+// WhatsApp berada dalam satu menu.
+const adminNavItems = [
+  { key: 'sessions', label: 'WA Sessions', icon: TbServer },
+  { key: 'simulation', label: 'Simulasi WAV', icon: TbLogin2 },
 ] as const
 
 type SideLink = {
@@ -146,6 +159,35 @@ function WaPage() {
     },
     { label: 'Pembaruan', icon: TbSparkles, color: 'teal', onClick: () => navigate({ to: '/changelog' }) },
   ]
+
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+
+  const renderTabItem = (item: { key: WaTab; label: string; icon: typeof TbCode }) =>
+    collapsed ? (
+      <Tooltip key={item.key} label={item.label} position="right">
+        <ActionIcon
+          variant={active === item.key ? 'light' : 'subtle'}
+          color={active === item.key ? 'blue' : 'gray'}
+          size="lg"
+          onClick={() => setActive(item.key)}
+          mb={4}
+          style={{ width: '100%' }}
+        >
+          <item.icon size={18} />
+        </ActionIcon>
+      </Tooltip>
+    ) : (
+      <NavLink
+        key={item.key}
+        label={item.label}
+        leftSection={<item.icon size={18} />}
+        rightSection={<TbChevronRight size={14} />}
+        active={active === item.key}
+        onClick={() => setActive(item.key)}
+        variant="light"
+        mb={4}
+      />
+    )
 
   const renderSideLink = (item: SideLink) =>
     collapsed ? (
@@ -252,33 +294,14 @@ function WaPage() {
           </Group>
         </AppShell.Section>
 
-        <AppShell.Section grow>
-          {navItems.map((item) =>
-            collapsed ? (
-              <Tooltip key={item.key} label={item.label} position="right">
-                <ActionIcon
-                  variant={active === item.key ? 'light' : 'subtle'}
-                  color={active === item.key ? 'blue' : 'gray'}
-                  size="lg"
-                  onClick={() => setActive(item.key)}
-                  mb={4}
-                  style={{ width: '100%' }}
-                >
-                  <item.icon size={18} />
-                </ActionIcon>
-              </Tooltip>
-            ) : (
-              <NavLink
-                key={item.key}
-                label={item.label}
-                leftSection={<item.icon size={18} />}
-                rightSection={<TbChevronRight size={14} />}
-                active={active === item.key}
-                onClick={() => setActive(item.key)}
-                variant="light"
-                mb={4}
-              />
-            ),
+        <AppShell.Section grow component={ScrollArea} type="scroll">
+          {navItems.map(renderTabItem)}
+
+          {isSuperAdmin && (
+            <>
+              {collapsed ? <Divider my={6} /> : <Divider my={6} label="Operator" labelPosition="left" />}
+              {adminNavItems.map(renderTabItem)}
+            </>
           )}
 
           {collapsed ? <Divider my={6} /> : <Divider my={6} label="Navigasi" labelPosition="left" />}
@@ -334,6 +357,8 @@ function WaPage() {
         {active === 'messages' && <WaMessagesPanel />}
         {active === 'policy' && <WaPolicyPanel />}
         {active === 'verify' && <WaVerifyPanel />}
+        {active === 'sessions' && isSuperAdmin && <WaSessionsPanel />}
+        {active === 'simulation' && isSuperAdmin && <SimLoginPanel />}
       </AppShell.Main>
     </AppShell>
   )

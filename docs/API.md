@@ -153,7 +153,7 @@ kosong = **discovery** (nomor pengirim jadi nomor terverifikasi).
 
 ### Simulasi Login (proxy SUPER_ADMIN, auth: session cookie)
 
-Menjalankan alur WAV end-to-end lewat browser untuk uji pra-rilis (route `/simulation`).
+Menjalankan alur WAV end-to-end lewat browser untuk uji pra-rilis (tab `/wa?tab=simulation`).
 **Proxy server-side**: endpoint cookie-auth menjalankan start/poll memakai consumer reserved
 `[simulation]` (lazy-create, idempoten via `getOrCreateSimConsumer`) — **API key tak pernah ke
 browser**, tapi pipeline yang dijalankan 100% asli. Request sim = `VerifyRequest` biasa →

@@ -54,7 +54,7 @@ Model `Verify*` adalah fitur **WAV (WhatsApp Inbound Verification)**. `VerifyCon
 sweep ~24 jam). WAV memakai satu Redis key: `wa:verify:watermark:<sessionId>`
 (watermark capture poller, lihat tabel di bawah). Lihat `docs/WA-VERIFY.md`.
 
-Halaman Simulasi Login (`/simulation`) memakai satu `VerifyConsumer` reserved bernama
+Tab Simulasi Login (`/wa?tab=simulation`) memakai satu `VerifyConsumer` reserved bernama
 `[simulation]` (lazy-create idempoten via `getOrCreateSimConsumer`, `webhookUrl=null` →
 polling-only). Request simulasi adalah `VerifyRequest` biasa milik consumer itu — tak ada
 tabel/schema baru. Lihat `docs/WA-VERIFY.md`.

@@ -22,8 +22,7 @@ Each file exports a named `*Route` const via `createRoute`. Never use `createFil
 | `profile.tsx` | `profileRoute` | `/profile` | authenticated |
 | `blocked.tsx` | `blockedRoute` | `/blocked` | authenticated |
 | `changelog.tsx` | `changelogRoute` | `/changelog` | authenticated — full version history from `GET /api/changelog?all=true` |
-| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|messages\|policy\|verify) |
-| `simulation.tsx` | `simulationRoute` | `/simulation` | SUPER_ADMIN, `validateSearch` for `?tab=` (login). AppShell+sidebar sendiri (clone pola dev.tsx, localStorage `simulation:sidebar`), cross-link balik ke `/dev` |
+| `wa.tsx` | `waRoute` | `/wa` | ADMIN+SUPER_ADMIN, `validateSearch` for `?tab=` (connection\|account\|send\|messages\|policy\|verify\|sessions\|simulation). Tab `sessions` & `simulation` khusus SUPER_ADMIN |
 
 **Rule:** new route → (1) create file, (2) export `*Route` via `createRoute`, (3) add to `router.ts` `addChildren([...])`.
 
@@ -108,7 +107,19 @@ File Health tab (`?tab=file-health`): scan seluruh file project, hitung line/cha
 `docs/FILE-HEALTH.md`, tampilkan status (ok/warn/critical/exempt) + worst offenders + progress bar.
 Component: `src/frontend/components/dev/FileHealthPanel.tsx`. Endpoint: `GET /api/admin/file-health`.
 
-WA Sessions tab (`?tab=wa-sessions`, icon `TbBrandWhatsapp`): panel operator SUPER_ADMIN
+Sidebar `/dev` punya satu NavLink **"WhatsApp"** (divider "WhatsApp", `navigate` →
+`/wa?tab=connection`, icon `TbBrandWhatsapp`) sebagai entry-point tunggal ke seluruh fitur
+WhatsApp — panel operator (WA Sessions) & Simulasi kini jadi tab di dalam `/wa`, bukan lagi
+item terpisah di `/dev`.
+
+## Tab operator SUPER_ADMIN di `/wa`
+
+Selain 6 tab dasar (connection/account/send/messages/policy/verify), sidebar `/wa`
+menampilkan dua tab tambahan **khusus SUPER_ADMIN** di bawah divider **"Operator"**
+(gated `isSuperAdmin`, di-render via `adminNavItems` + `renderTabItem`; grow section
+memakai `component={ScrollArea}` agar muat saat sidebar penuh):
+
+WA Sessions tab (`?tab=sessions`, icon `TbServer`): panel operator SUPER_ADMIN
 untuk melihat **semua** sesi raw di container WhatsApp (termasuk sesi orphan) + terminate
 manual per sesi. Query `['admin','wa-sessions']` GET `/api/admin/wa-sessions` (refetch 10s).
 Tabel: Session ID (truncate + tooltip, monospace), Status (badge hijau bila connected),
@@ -118,15 +129,9 @@ Badge ringkasan total/connected/orphan. Baris milik operator yang sedang login (
 `useSession().data.user.id`) ditandai highlight biru + badge "Sesi Anda". Component:
 `src/frontend/components/dev/WaSessionsPanel.tsx`.
 
-Sidebar `/dev` mengelompokkan navigasi terkait WhatsApp di bawah divider **"WhatsApp"**
-(terpisah dari grup "Apps"): **WA Sessions** (tab internal `?tab=wa-sessions` via
-`setActive`, bukan navItems lagi), **WhatsApp** (`navigate` → `/wa?tab=connection`, icon
-`TbBrandWhatsapp`), dan **Simulation** (`navigate` → `/simulation?tab=login`, icon
-`TbLogin2`).
+### Tab Simulasi Login WAV (`?tab=simulation`, `src/frontend/components/sim/`)
 
-### Halaman Simulasi Login (`/simulation`, `src/frontend/components/sim/`)
-
-Route standalone SUPER_ADMIN untuk menguji alur WAV end-to-end lewat browser sebelum rilis.
+Tab SUPER_ADMIN di `/wa` untuk menguji alur WAV end-to-end lewat browser sebelum rilis.
 Proxy server-side (API key tak ke browser); datanya juga muncul di panel Requests `/wa?tab=verify`.
 
 - `SimLoginPanel.tsx` — orchestrator. Kartu "halaman login palsu" (input nomor = `expectedPhone`,

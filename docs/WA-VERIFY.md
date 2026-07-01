@@ -261,7 +261,7 @@ replay), `WaVerifyInbound` (raw log, SUPER_ADMIN saja). Lihat `docs/FRONTEND.md`
 
 ## Simulasi Login (browser, pra-rilis)
 
-Route standalone `/simulation` (SUPER_ADMIN) menjalankan alur login WAV end-to-end
+Tab `/wa?tab=simulation` (SUPER_ADMIN) menjalankan alur login WAV end-to-end
 lewat browser sebelum rilis: dari "halaman login palsu" → klik → buka WhatsApp dengan
 token terisi → operator kirim → dashboard poll sampai `VERIFIED`. Sifatnya uji, jadi
 ikut menampilkan **log timeline berstempel waktu** tiap langkah (untuk developer).

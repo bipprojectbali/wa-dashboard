@@ -8,7 +8,6 @@ import { devRoute } from './routes/dev'
 import { indexRoute } from './routes/index'
 import { loginRoute } from './routes/login'
 import { profileRoute } from './routes/profile'
-import { simulationRoute } from './routes/simulation'
 import { waRoute } from './routes/wa'
 
 const routeTree = rootRoute.addChildren([
@@ -20,7 +19,6 @@ const routeTree = rootRoute.addChildren([
   blockedRoute,
   changelogRoute,
   waRoute,
-  simulationRoute,
 ])
 
 export const router = createRouter({

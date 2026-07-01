@@ -31,7 +31,6 @@ import {
   TbLayoutDashboard,
   TbLayoutSidebarLeftCollapse,
   TbLayoutSidebarLeftExpand,
-  TbLogin2,
   TbLogout,
   TbMoon,
   TbRuler2,
@@ -53,7 +52,6 @@ import { PlaceholderPanel } from '@/frontend/components/dev/PlaceholderPanel'
 import { ProjectPanel } from '@/frontend/components/dev/ProjectPanel'
 import { UserLogsPanel } from '@/frontend/components/dev/UserLogsPanel'
 import { UsersPanel } from '@/frontend/components/dev/UsersPanel'
-import { WaSessionsPanel } from '@/frontend/components/dev/WaSessionsPanel'
 import { TicketsPanel } from '@/frontend/components/TicketsPanel'
 import { UserAvatar } from '@/frontend/components/UserAvatar'
 import { openWhatsNew } from '@/frontend/components/WhatsNewModal'
@@ -71,7 +69,6 @@ const validTabs = [
   'project',
   'file-health',
   'api-docs',
-  'wa-sessions',
   'settings',
 ] as const
 
@@ -317,31 +314,6 @@ function DevPage() {
           {collapsed ? <Divider my={6} /> : <Divider my={6} label="WhatsApp" labelPosition="left" />}
 
           {collapsed ? (
-            <Tooltip label="WA Sessions" position="right">
-              <ActionIcon
-                variant={active === 'wa-sessions' ? 'light' : 'subtle'}
-                color={active === 'wa-sessions' ? 'blue' : 'gray'}
-                size="lg"
-                mb={4}
-                style={{ width: '100%' }}
-                onClick={() => setActive('wa-sessions')}
-              >
-                <TbBrandWhatsapp size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <NavLink
-              label="WA Sessions"
-              leftSection={<TbBrandWhatsapp size={18} />}
-              rightSection={<TbChevronRight size={14} />}
-              active={active === 'wa-sessions'}
-              onClick={() => setActive('wa-sessions')}
-              variant="light"
-              mb={4}
-            />
-          )}
-
-          {collapsed ? (
             <Tooltip label="WhatsApp" position="right">
               <ActionIcon
                 variant="subtle"
@@ -357,34 +329,10 @@ function DevPage() {
           ) : (
             <NavLink
               label="WhatsApp"
+              description="Koneksi, pesan, verifikasi, sesi & simulasi"
               leftSection={<TbBrandWhatsapp size={18} />}
               rightSection={<TbChevronRight size={14} />}
               onClick={() => navigate({ to: '/wa', search: { tab: 'connection' } })}
-              variant="light"
-              mb={4}
-            />
-          )}
-
-          {collapsed ? (
-            <Tooltip label="Simulation" position="right">
-              <ActionIcon
-                variant="subtle"
-                color="violet"
-                size="lg"
-                mb={4}
-                style={{ width: '100%' }}
-                onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
-              >
-                <TbLogin2 size={18} />
-              </ActionIcon>
-            </Tooltip>
-          ) : (
-            <NavLink
-              label="Simulation"
-              description="Uji alur WAV end-to-end"
-              leftSection={<TbLogin2 size={18} />}
-              rightSection={<TbChevronRight size={14} />}
-              onClick={() => navigate({ to: '/simulation', search: { tab: 'login' } })}
               variant="light"
               mb={4}
             />
@@ -482,7 +430,6 @@ function DevPage() {
         {active === 'project' && <ProjectPanel />}
         {active === 'file-health' && <FileHealthPanel />}
         {active === 'api-docs' && <ApiDocsPanel />}
-        {active === 'wa-sessions' && <WaSessionsPanel />}
         {active === 'settings' && (
           <PlaceholderPanel title="Settings" desc="System configuration akan ditampilkan di sini." icon={TbSettings} />
         )}

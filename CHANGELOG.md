@@ -3,6 +3,11 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.1.10] - 2026-07-01
+
+### Changed
+- **Konsolidasi navigasi WhatsApp ke satu menu `/wa`** — panel operator **WA Sessions** dan **Simulasi Login WAV** yang sebelumnya tersebar (tab `/dev?tab=wa-sessions` dan route standalone `/simulation`) kini menjadi tab di dalam `/wa` (`?tab=sessions` & `?tab=simulation`), khusus SUPER_ADMIN di bawah divider "Operator". Sidebar `/dev` menyisakan satu link "WhatsApp" sebagai entry-point tunggal. Route `/simulation` dihapus (komponen `SimLoginPanel` dipakai ulang sebagai tab). Tak ada perubahan endpoint/backend — semua REST WAV (`/api/wa/verify/sim/*`, `/api/admin/wa-sessions`) tetap sama.
+
 ## [0.1.9] - 2026-06-30
 
 ### Fixed
